@@ -166,18 +166,34 @@ body {
 }
 
 /* Hierarchical Structure */
-.todo-item[style*="margin-left"] {
-    border-left: 3px solid #e0e0e0;
-    margin-left: 0 !important;
-    padding-left: 30px;
+.todo-item {
+    --indent-level: 0;
+    --indent-size: 30px;
+    margin-left: calc(var(--indent-level) * var(--indent-size));
+}
+
+.todo-item.level-1 { --indent-level: 1; }
+.todo-item.level-2 { --indent-level: 2; }
+.todo-item.level-3 { --indent-level: 3; }
+.todo-item.level-4 { --indent-level: 4; }
+.todo-item.level-5 { --indent-level: 5; }
+.todo-item.level-6 { --indent-level: 6; }
+.todo-item.level-7 { --indent-level: 7; }
+.todo-item.level-8 { --indent-level: 8; }
+.todo-item.level-9 { --indent-level: 9; }
+.todo-item.level-10 { --indent-level: 10; }
+
+/* Hierarchical visual indicators */
+.todo-item[class*="level-"] {
+    border-left: 3px solid transparent;
     position: relative;
 }
 
-.todo-item[style*="margin-left: 30px"] {
+.todo-item.level-1 {
     border-left-color: #667eea;
 }
 
-.todo-item[style*="margin-left: 30px"]::before {
+.todo-item.level-1::before {
     content: '';
     position: absolute;
     left: -3px;
@@ -187,11 +203,11 @@ body {
     background: linear-gradient(to bottom, #667eea, rgba(102, 126, 234, 0.3));
 }
 
-.todo-item[style*="margin-left: 60px"] {
+.todo-item.level-2 {
     border-left-color: #4CAF50;
 }
 
-.todo-item[style*="margin-left: 60px"]::before {
+.todo-item.level-2::before {
     content: '';
     position: absolute;
     left: -3px;
@@ -201,11 +217,11 @@ body {
     background: linear-gradient(to bottom, #4CAF50, rgba(76, 175, 80, 0.3));
 }
 
-.todo-item[style*="margin-left: 90px"] {
+.todo-item.level-3 {
     border-left-color: #FF9800;
 }
 
-.todo-item[style*="margin-left: 90px"]::before {
+.todo-item.level-3::before {
     content: '';
     position: absolute;
     left: -3px;
@@ -215,11 +231,11 @@ body {
     background: linear-gradient(to bottom, #FF9800, rgba(255, 152, 0, 0.3));
 }
 
-.todo-item[style*="margin-left: 120px"] {
+.todo-item.level-4 {
     border-left-color: #9C27B0;
 }
 
-.todo-item[style*="margin-left: 120px"]::before {
+.todo-item.level-4::before {
     content: '';
     position: absolute;
     left: -3px;
@@ -227,6 +243,70 @@ body {
     bottom: 0;
     width: 3px;
     background: linear-gradient(to bottom, #9C27B0, rgba(156, 39, 176, 0.3));
+}
+
+.todo-item.level-5 {
+    border-left-color: #F44336;
+}
+
+.todo-item.level-5::before {
+    content: '';
+    position: absolute;
+    left: -3px;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(to bottom, #F44336, rgba(244, 67, 54, 0.3));
+}
+
+.todo-item.level-6 {
+    border-left-color: #00BCD4;
+}
+
+.todo-item.level-6::before {
+    content: '';
+    position: absolute;
+    left: -3px;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(to bottom, #00BCD4, rgba(0, 188, 212, 0.3));
+}
+
+/* For deeper levels, use a cycling color pattern */
+.todo-item.level-7 { border-left-color: #795548; }
+.todo-item.level-8 { border-left-color: #607D8B; }
+.todo-item.level-9 { border-left-color: #E91E63; }
+.todo-item.level-10 { border-left-color: #3F51B5; }
+
+.todo-item.level-7::before,
+.todo-item.level-8::before,
+.todo-item.level-9::before,
+.todo-item.level-10::before {
+    content: '';
+    position: absolute;
+    left: -3px;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: currentColor;
+    opacity: 0.6;
+}
+
+/* For levels beyond 10, use a default style */
+.todo-item[class*="level-"]:not(.level-1):not(.level-2):not(.level-3):not(.level-4):not(.level-5):not(.level-6):not(.level-7):not(.level-8):not(.level-9):not(.level-10) {
+    border-left-color: #999;
+}
+
+.todo-item[class*="level-"]:not(.level-1):not(.level-2):not(.level-3):not(.level-4):not(.level-5):not(.level-6):not(.level-7):not(.level-8):not(.level-9):not(.level-10)::before {
+    content: '';
+    position: absolute;
+    left: -3px;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: #999;
+    opacity: 0.4;
 }
 
 .todo-item {
@@ -591,8 +671,12 @@ body {
         padding: 4px 6px;
     }
     
-    .todo-item[style*="margin-left"] {
-        padding-left: 20px;
+    .todo-item {
+        --indent-size: 20px;
+    }
+    
+    .todo-item[class*="level-"] {
+        border-left-width: 2px;
     }
 }
 
