@@ -52,6 +52,10 @@ class TodoApp {
         }
 
         const parentLevel = parentId ? this.todos.find(t => t.id === parentId)?.level || 0 : -1;
+        // Calculate correct order based on siblings
+        const siblings = this.todos.filter(t => t.parentId === parentId);
+        const order = siblings.length;
+        
         const todo = {
             id: Date.now().toString(),
             text: text,
@@ -59,7 +63,7 @@ class TodoApp {
             createdAt: new Date().toISOString(),
             parentId: parentId,
             level: parentLevel + 1,
-            order: this.todos.length
+            order: order
         };
 
         this.todos.unshift(todo);
@@ -122,6 +126,10 @@ class TodoApp {
             }
 
             const parentLevel = parentTodo.level;
+            // Calculate correct order based on siblings
+            const siblings = this.todos.filter(t => t.parentId === parentId);
+            const order = siblings.length;
+            
             const todo = {
                 id: Date.now().toString(),
                 text: text.trim(),
@@ -129,7 +137,7 @@ class TodoApp {
                 createdAt: new Date().toISOString(),
                 parentId: parentId,
                 level: parentLevel + 1,
-                order: this.todos.length
+                order: order
             };
 
             this.todos.unshift(todo);
