@@ -173,13 +173,35 @@ class TodoApp {
         const currentIndex = siblings.findIndex(t => t.id === id);
         
         if (direction === 'up' && currentIndex > 0) {
-            [siblings[currentIndex], siblings[currentIndex - 1]] = [siblings[currentIndex - 1], siblings[currentIndex]];
+            // Hoán đổi vị trí trong mảng gốc
+            const currentTodo = siblings[currentIndex];
+            const previousTodo = siblings[currentIndex - 1];
+            
+            // Tìm index trong mảng gốc
+            const currentIndexInMain = this.todos.findIndex(t => t.id === currentTodo.id);
+            const previousIndexInMain = this.todos.findIndex(t => t.id === previousTodo.id);
+            
+            // Hoán đổi trong mảng gốc
+            [this.todos[currentIndexInMain], this.todos[previousIndexInMain]] = 
+            [this.todos[previousIndexInMain], this.todos[currentIndexInMain]];
+            
         } else if (direction === 'down' && currentIndex < siblings.length - 1) {
-            [siblings[currentIndex], siblings[currentIndex + 1]] = [siblings[currentIndex + 1], siblings[currentIndex]];
+            // Hoán đổi vị trí trong mảng gốc
+            const currentTodo = siblings[currentIndex];
+            const nextTodo = siblings[currentIndex + 1];
+            
+            // Tìm index trong mảng gốc
+            const currentIndexInMain = this.todos.findIndex(t => t.id === currentTodo.id);
+            const nextIndexInMain = this.todos.findIndex(t => t.id === nextTodo.id);
+            
+            // Hoán đổi trong mảng gốc
+            [this.todos[currentIndexInMain], this.todos[nextIndexInMain]] = 
+            [this.todos[nextIndexInMain], this.todos[currentIndexInMain]];
         }
 
-        // Cập nhật order
-        siblings.forEach((sibling, index) => {
+        // Cập nhật lại order cho tất cả siblings
+        const updatedSiblings = this.todos.filter(t => t.parentId === todo.parentId);
+        updatedSiblings.forEach((sibling, index) => {
             sibling.order = index;
         });
 
@@ -191,6 +213,9 @@ class TodoApp {
     changeLevel(id, direction) {
         const todo = this.todos.find(t => t.id === id);
         if (!todo) return;
+
+        const oldParentId = todo.parentId;
+        const oldLevel = todo.level;
 
         if (direction === 'promote' && todo.level > 0) {
             // Tìm parent của parent
@@ -212,6 +237,26 @@ class TodoApp {
                 todo.parentId = newParent.id;
                 todo.level = newParent.level + 1;
             }
+        }
+
+        // Nếu có thay đổi level, di chuyển todo xuống cuối danh sách siblings mới (indent effect)
+        if (oldParentId !== todo.parentId || oldLevel !== todo.level) {
+            // Tìm tất cả siblings mới
+            const newSiblings = this.todos.filter(t => t.parentId === todo.parentId && t.id !== todo.id);
+            
+            // Cập nhật order cho siblings cũ (loại bỏ todo hiện tại)
+            const oldSiblings = this.todos.filter(t => t.parentId === oldParentId && t.id !== todo.id);
+            oldSiblings.forEach((sibling, index) => {
+                sibling.order = index;
+            });
+            
+            // Đặt todo mới ở cuối danh sách siblings mới
+            todo.order = newSiblings.length;
+            
+            // Cập nhật order cho tất cả siblings mới
+            newSiblings.forEach((sibling, index) => {
+                sibling.order = index;
+            });
         }
 
         this.saveTodos();
