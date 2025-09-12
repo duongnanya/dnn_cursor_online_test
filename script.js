@@ -116,6 +116,16 @@ class TodoApp {
         return children;
     }
 
+    getChildrenCount(parentId) {
+        // Đếm tất cả children trực tiếp và gián tiếp
+        return this.getAllChildren(parentId).length;
+    }
+
+    hasChildren(parentId) {
+        // Kiểm tra xem todo có children trực tiếp không
+        return this.todos.some(todo => todo.parentId === parentId);
+    }
+
     addSubTodo(parentId) {
         const parentTodo = this.todos.find(t => t.id === parentId);
         if (!parentTodo) return;
@@ -408,7 +418,10 @@ class TodoApp {
                         ${todo.completed ? '<i class="fas fa-check"></i>' : ''}
                     </div>
                     <div class="todo-text ${todo.completed ? 'completed' : ''}" 
-                         ondblclick="todoApp.editTodo('${todo.id}')">${this.escapeHtml(todo.text)}</div>
+                         ondblclick="todoApp.editTodo('${todo.id}')">
+                        <span class="todo-text-content">${this.escapeHtml(todo.text)}</span>
+                        ${this.hasChildren(todo.id) ? `<span class="children-count">${this.getChildrenCount(todo.id)}</span>` : ''}
+                    </div>
                 </div>
                 <div class="todo-actions">
                     <button class="action-btn add-sub-btn" onclick="todoApp.addSubTodo('${todo.id}')" 
