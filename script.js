@@ -3,6 +3,8 @@ class TodoApp {
     constructor() {
         this.todos = this.loadTodos();
         this.currentFilter = 'all';
+        this.draggedTodo = null;
+        this.dropTarget = null;
         this.init();
     }
 
@@ -165,103 +167,131 @@ class TodoApp {
         }
     }
 
-    moveTodo(id, direction) {
-        const todo = this.todos.find(t => t.id === id);
-        if (!todo) return;
 
-        const siblings = this.todos.filter(t => t.parentId === todo.parentId);
-        const currentIndex = siblings.findIndex(t => t.id === id);
+    // Drag & Drop Methods
+    handleDragStart(event) {
+        const todoId = event.target.closest('.todo-item').dataset.id;
+        this.draggedTodo = this.todos.find(t => t.id === todoId);
+        event.target.closest('.todo-item').classList.add('dragging');
         
-        if (direction === 'up' && currentIndex > 0) {
-            // Hoán đổi vị trí trong mảng gốc
-            const currentTodo = siblings[currentIndex];
-            const previousTodo = siblings[currentIndex - 1];
-            
-            // Tìm index trong mảng gốc
-            const currentIndexInMain = this.todos.findIndex(t => t.id === currentTodo.id);
-            const previousIndexInMain = this.todos.findIndex(t => t.id === previousTodo.id);
-            
-            // Hoán đổi trong mảng gốc
-            [this.todos[currentIndexInMain], this.todos[previousIndexInMain]] = 
-            [this.todos[previousIndexInMain], this.todos[currentIndexInMain]];
-            
-        } else if (direction === 'down' && currentIndex < siblings.length - 1) {
-            // Hoán đổi vị trí trong mảng gốc
-            const currentTodo = siblings[currentIndex];
-            const nextTodo = siblings[currentIndex + 1];
-            
-            // Tìm index trong mảng gốc
-            const currentIndexInMain = this.todos.findIndex(t => t.id === currentTodo.id);
-            const nextIndexInMain = this.todos.findIndex(t => t.id === nextTodo.id);
-            
-            // Hoán đổi trong mảng gốc
-            [this.todos[currentIndexInMain], this.todos[nextIndexInMain]] = 
-            [this.todos[nextIndexInMain], this.todos[currentIndexInMain]];
-        }
-
-        // Cập nhật lại order cho tất cả siblings
-        const updatedSiblings = this.todos.filter(t => t.parentId === todo.parentId);
-        updatedSiblings.forEach((sibling, index) => {
-            sibling.order = index;
-        });
-
-        this.saveTodos();
-        this.render();
-        this.showMessage('Đã thay đổi thứ tự!', 'success');
+        // Set drag data
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/html', event.target.outerHTML);
     }
 
-    changeLevel(id, direction) {
-        const todo = this.todos.find(t => t.id === id);
-        if (!todo) return;
+    handleDragOver(event) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+    }
 
-        const oldParentId = todo.parentId;
-        const oldLevel = todo.level;
-
-        if (direction === 'promote' && todo.level > 0) {
-            // Tìm parent của parent
-            const grandParent = this.todos.find(t => t.id === todo.parentId);
-            if (grandParent) {
-                todo.parentId = grandParent.parentId;
-                todo.level = grandParent.level;
-            } else {
-                todo.parentId = null;
-                todo.level = 0;
-            }
-        } else if (direction === 'demote') {
-            // Tìm sibling trước đó để làm parent
-            const siblings = this.todos.filter(t => t.parentId === todo.parentId);
-            const currentIndex = siblings.findIndex(t => t.id === id);
-            
-            if (currentIndex > 0) {
-                const newParent = siblings[currentIndex - 1];
-                todo.parentId = newParent.id;
-                todo.level = newParent.level + 1;
+    handleDragEnter(event) {
+        event.preventDefault();
+        const todoItem = event.target.closest('.todo-item');
+        if (todoItem && this.draggedTodo) {
+            const targetId = todoItem.dataset.id;
+            if (targetId !== this.draggedTodo.id) {
+                this.dropTarget = this.todos.find(t => t.id === targetId);
+                todoItem.classList.add('drag-over-child');
             }
         }
+    }
 
-        // Nếu có thay đổi level, di chuyển todo xuống cuối danh sách siblings mới (indent effect)
-        if (oldParentId !== todo.parentId || oldLevel !== todo.level) {
-            // Tìm tất cả siblings mới
-            const newSiblings = this.todos.filter(t => t.parentId === todo.parentId && t.id !== todo.id);
-            
-            // Cập nhật order cho siblings cũ (loại bỏ todo hiện tại)
-            const oldSiblings = this.todos.filter(t => t.parentId === oldParentId && t.id !== todo.id);
+    handleDragLeave(event) {
+        const todoItem = event.target.closest('.todo-item');
+        if (todoItem) {
+            todoItem.classList.remove('drag-over-child');
+        }
+    }
+
+    handleDrop(event) {
+        event.preventDefault();
+        
+        const todoItem = event.target.closest('.todo-item');
+        if (!todoItem || !this.draggedTodo || !this.dropTarget) {
+            this.cleanupDrag();
+            return;
+        }
+
+        const targetId = todoItem.dataset.id;
+        if (targetId === this.draggedTodo.id) {
+            this.cleanupDrag();
+            return;
+        }
+
+        // Kiểm tra không thể kéo todo cha vào todo con của chính nó
+        if (this.isDescendant(this.draggedTodo.id, this.dropTarget.id)) {
+            this.showMessage('Không thể kéo todo cha vào todo con của chính nó!', 'warning');
+            this.cleanupDrag();
+            return;
+        }
+
+        // Thực hiện việc tạo quan hệ cha-con
+        this.makeChildOf(this.draggedTodo.id, this.dropTarget.id);
+        
+        this.cleanupDrag();
+        this.saveTodos();
+        this.render();
+        this.showMessage('Đã tạo quan hệ cha-con thành công!', 'success');
+    }
+
+    handleDragEnd(event) {
+        this.cleanupDrag();
+    }
+
+    cleanupDrag() {
+        // Remove all drag-related classes
+        document.querySelectorAll('.todo-item').forEach(item => {
+            item.classList.remove('dragging', 'drag-over', 'drag-over-child');
+        });
+        
+        this.draggedTodo = null;
+        this.dropTarget = null;
+    }
+
+    isDescendant(parentId, childId) {
+        const child = this.todos.find(t => t.id === childId);
+        if (!child || !child.parentId) return false;
+        
+        if (child.parentId === parentId) return true;
+        return this.isDescendant(parentId, child.parentId);
+    }
+
+    makeChildOf(childId, parentId) {
+        const child = this.todos.find(t => t.id === childId);
+        const parent = this.todos.find(t => t.id === parentId);
+        
+        if (!child || !parent) return;
+
+        // Cập nhật thông tin của child
+        const oldParentId = child.parentId;
+        child.parentId = parentId;
+        child.level = parent.level + 1;
+
+        // Cập nhật order cho siblings mới
+        const newSiblings = this.todos.filter(t => t.parentId === parentId && t.id !== childId);
+        child.order = newSiblings.length;
+
+        // Cập nhật order cho siblings cũ
+        if (oldParentId !== null) {
+            const oldSiblings = this.todos.filter(t => t.parentId === oldParentId);
             oldSiblings.forEach((sibling, index) => {
                 sibling.order = index;
             });
-            
-            // Đặt todo mới ở cuối danh sách siblings mới
-            todo.order = newSiblings.length;
-            
-            // Cập nhật order cho tất cả siblings mới
-            newSiblings.forEach((sibling, index) => {
-                sibling.order = index;
-            });
         }
 
-        this.saveTodos();
-        this.render();
-        this.showMessage('Đã thay đổi cấp độ!', 'success');
+        // Cập nhật level cho tất cả children của child
+        this.updateChildrenLevel(childId);
+    }
+
+    updateChildrenLevel(parentId) {
+        const parent = this.todos.find(t => t.id === parentId);
+        if (!parent) return;
+
+        const children = this.todos.filter(t => t.parentId === parentId);
+        children.forEach(child => {
+            child.level = parent.level + 1;
+            this.updateChildrenLevel(child.id);
+        });
     }
 
     setFilter(filter) {
@@ -361,8 +391,18 @@ class TodoApp {
         emptyState.classList.remove('show');
         
         todoList.innerHTML = filteredTodos.map(todo => `
-            <div class="todo-item" data-id="${todo.id}" style="margin-left: ${todo.level * 30}px;">
+            <div class="todo-item" data-id="${todo.id}" style="margin-left: ${todo.level * 30}px;" 
+                 draggable="true" 
+                 ondragstart="todoApp.handleDragStart(event)"
+                 ondragover="todoApp.handleDragOver(event)"
+                 ondrop="todoApp.handleDrop(event)"
+                 ondragenter="todoApp.handleDragEnter(event)"
+                 ondragleave="todoApp.handleDragLeave(event)"
+                 ondragend="todoApp.handleDragEnd(event)">
                 <div class="todo-content">
+                    <div class="drag-handle" title="Kéo để di chuyển">
+                        <i class="fas fa-grip-vertical"></i>
+                    </div>
                     <div class="todo-checkbox ${todo.completed ? 'completed' : ''}" 
                          onclick="todoApp.toggleTodo('${todo.id}')">
                         ${todo.completed ? '<i class="fas fa-check"></i>' : ''}
@@ -379,26 +419,6 @@ class TodoApp {
                             title="Chỉnh sửa">
                         <i class="fas fa-edit"></i>
                     </button>
-                    <div class="move-controls">
-                        <button class="action-btn move-btn" onclick="todoApp.moveTodo('${todo.id}', 'up')" 
-                                title="Di chuyển lên">
-                            <i class="fas fa-arrow-up"></i>
-                        </button>
-                        <button class="action-btn move-btn" onclick="todoApp.moveTodo('${todo.id}', 'down')" 
-                                title="Di chuyển xuống">
-                            <i class="fas fa-arrow-down"></i>
-                        </button>
-                    </div>
-                    <div class="level-controls">
-                        <button class="action-btn level-btn" onclick="todoApp.changeLevel('${todo.id}', 'promote')" 
-                                title="Nâng cấp" ${todo.level === 0 ? 'disabled' : ''}>
-                            <i class="fas fa-arrow-left"></i>
-                        </button>
-                        <button class="action-btn level-btn" onclick="todoApp.changeLevel('${todo.id}', 'demote')" 
-                                title="Hạ cấp">
-                            <i class="fas fa-arrow-right"></i>
-                        </button>
-                    </div>
                     <button class="action-btn delete-btn" onclick="todoApp.deleteTodo('${todo.id}')" 
                             title="Xóa">
                         <i class="fas fa-trash"></i>

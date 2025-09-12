@@ -167,25 +167,66 @@ body {
 
 /* Hierarchical Structure */
 .todo-item[style*="margin-left"] {
-    border-left: 2px solid #e0e0e0;
+    border-left: 3px solid #e0e0e0;
     margin-left: 0 !important;
     padding-left: 30px;
+    position: relative;
 }
 
 .todo-item[style*="margin-left: 30px"] {
     border-left-color: #667eea;
 }
 
+.todo-item[style*="margin-left: 30px"]::before {
+    content: '';
+    position: absolute;
+    left: -3px;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(to bottom, #667eea, rgba(102, 126, 234, 0.3));
+}
+
 .todo-item[style*="margin-left: 60px"] {
     border-left-color: #4CAF50;
+}
+
+.todo-item[style*="margin-left: 60px"]::before {
+    content: '';
+    position: absolute;
+    left: -3px;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(to bottom, #4CAF50, rgba(76, 175, 80, 0.3));
 }
 
 .todo-item[style*="margin-left: 90px"] {
     border-left-color: #FF9800;
 }
 
+.todo-item[style*="margin-left: 90px"]::before {
+    content: '';
+    position: absolute;
+    left: -3px;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(to bottom, #FF9800, rgba(255, 152, 0, 0.3));
+}
+
 .todo-item[style*="margin-left: 120px"] {
     border-left-color: #9C27B0;
+}
+
+.todo-item[style*="margin-left: 120px"]::before {
+    content: '';
+    position: absolute;
+    left: -3px;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(to bottom, #9C27B0, rgba(156, 39, 176, 0.3));
 }
 
 .todo-item {
@@ -312,29 +353,96 @@ body {
     transform: scale(1.05);
 }
 
-.move-controls, .level-controls {
-    display: flex;
-    gap: 2px;
+/* Drag Handle */
+.drag-handle {
+    margin-right: 10px;
+    color: #ccc;
+    cursor: grab;
+    padding: 2px;
+    transition: color 0.3s ease;
 }
 
-.move-btn {
-    background: #FF9800;
+.drag-handle:hover {
+    color: #667eea;
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+/* Drag & Drop States */
+.todo-item.dragging {
+    opacity: 0.6;
+    transform: rotate(2deg) scale(1.02);
+    box-shadow: 0 15px 30px rgba(0,0,0,0.3);
+    z-index: 1000;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.todo-item.drag-over {
+    background: rgba(102, 126, 234, 0.1);
+    border: 2px dashed #667eea;
+    border-radius: 8px;
+    transform: scale(1.02);
+    animation: pulse 1s infinite;
+}
+
+.todo-item.drag-over-child {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.1), rgba(76, 175, 80, 0.05));
+    border: 2px dashed #4CAF50;
+    border-left: 4px solid #4CAF50;
+    border-radius: 8px;
+    transform: scale(1.02);
+    box-shadow: 0 5px 15px rgba(76, 175, 80, 0.2);
+}
+
+.todo-item.drag-over-child::after {
+    content: "Thả vào đây để tạo quan hệ cha-con";
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    background: #4CAF50;
     color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    z-index: 1001;
+    opacity: 0.9;
 }
 
-.move-btn:hover {
-    background: #F57C00;
-    transform: scale(1.05);
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.4);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(102, 126, 234, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(102, 126, 234, 0);
+    }
 }
 
-.level-btn {
-    background: #9C27B0;
-    color: white;
+.drop-zone-indicator {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    border-radius: 2px;
+    z-index: 999;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
 }
 
-.level-btn:hover {
-    background: #7B1FA2;
-    transform: scale(1.05);
+.drop-zone-indicator.top {
+    top: -2px;
+}
+
+.drop-zone-indicator.bottom {
+    bottom: -2px;
 }
 
 .delete-btn {
@@ -481,10 +589,6 @@ body {
         height: 24px;
         font-size: 0.7rem;
         padding: 4px 6px;
-    }
-    
-    .move-controls, .level-controls {
-        gap: 1px;
     }
     
     .todo-item[style*="margin-left"] {
