@@ -37,7 +37,7 @@ class TodoApp {
         clearBtn.addEventListener('click', () => this.clearCompleted());
     }
 
-    addTodo() {
+    addTodo(parentId = null) {
         const input = document.getElementById('todoInput');
         const text = input.value.trim();
         
@@ -51,11 +51,15 @@ class TodoApp {
             return;
         }
 
+        const parentLevel = parentId ? this.todos.find(t => t.id === parentId)?.level || 0 : -1;
         const todo = {
             id: Date.now().toString(),
             text: text,
             completed: false,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            parentId: parentId,
+            level: parentLevel + 1,
+            order: this.todos.length
         };
 
         this.todos.unshift(todo);
@@ -80,13 +84,131 @@ class TodoApp {
     }
 
     deleteTodo(id) {
-        if (confirm('Bạn có chắc muốn xóa công việc này?')) {
-            this.todos = this.todos.filter(t => t.id !== id);
+        if (confirm('Bạn có chắc muốn xóa công việc này và tất cả công việc con?')) {
+            // Xóa todo và tất cả todo con
+            const todosToDelete = this.getAllChildren(id);
+            todosToDelete.push(id);
+            this.todos = this.todos.filter(t => !todosToDelete.includes(t.id));
             this.saveTodos();
             this.render();
             this.updateStats();
             this.showMessage('Đã xóa công việc!', 'success');
         }
+    }
+
+    getAllChildren(parentId) {
+        const children = [];
+        const findChildren = (id) => {
+            this.todos.forEach(todo => {
+                if (todo.parentId === id) {
+                    children.push(todo.id);
+                    findChildren(todo.id);
+                }
+            });
+        };
+        findChildren(parentId);
+        return children;
+    }
+
+    addSubTodo(parentId) {
+        const parentTodo = this.todos.find(t => t.id === parentId);
+        if (!parentTodo) return;
+
+        const text = prompt(`Thêm công việc con cho "${parentTodo.text}":`);
+        if (text && text.trim()) {
+            if (text.trim().length > 100) {
+                this.showMessage('Nội dung công việc quá dài (tối đa 100 ký tự)!', 'warning');
+                return;
+            }
+
+            const parentLevel = parentTodo.level;
+            const todo = {
+                id: Date.now().toString(),
+                text: text.trim(),
+                completed: false,
+                createdAt: new Date().toISOString(),
+                parentId: parentId,
+                level: parentLevel + 1,
+                order: this.todos.length
+            };
+
+            this.todos.unshift(todo);
+            this.saveTodos();
+            this.render();
+            this.updateStats();
+            this.showMessage('Đã thêm công việc con!', 'success');
+        }
+    }
+
+    editTodo(id) {
+        const todo = this.todos.find(t => t.id === id);
+        if (!todo) return;
+
+        const newText = prompt('Chỉnh sửa công việc:', todo.text);
+        if (newText !== null && newText.trim() !== '') {
+            if (newText.trim().length > 100) {
+                this.showMessage('Nội dung công việc quá dài (tối đa 100 ký tự)!', 'warning');
+                return;
+            }
+            todo.text = newText.trim();
+            this.saveTodos();
+            this.render();
+            this.showMessage('Đã cập nhật công việc!', 'success');
+        }
+    }
+
+    moveTodo(id, direction) {
+        const todo = this.todos.find(t => t.id === id);
+        if (!todo) return;
+
+        const siblings = this.todos.filter(t => t.parentId === todo.parentId);
+        const currentIndex = siblings.findIndex(t => t.id === id);
+        
+        if (direction === 'up' && currentIndex > 0) {
+            [siblings[currentIndex], siblings[currentIndex - 1]] = [siblings[currentIndex - 1], siblings[currentIndex]];
+        } else if (direction === 'down' && currentIndex < siblings.length - 1) {
+            [siblings[currentIndex], siblings[currentIndex + 1]] = [siblings[currentIndex + 1], siblings[currentIndex]];
+        }
+
+        // Cập nhật order
+        siblings.forEach((sibling, index) => {
+            sibling.order = index;
+        });
+
+        this.saveTodos();
+        this.render();
+        this.showMessage('Đã thay đổi thứ tự!', 'success');
+    }
+
+    changeLevel(id, direction) {
+        const todo = this.todos.find(t => t.id === id);
+        if (!todo) return;
+
+        if (direction === 'promote' && todo.level > 0) {
+            // Tìm parent của parent
+            const grandParent = this.todos.find(t => t.id === todo.parentId);
+            if (grandParent) {
+                todo.parentId = grandParent.parentId;
+                todo.level = grandParent.level;
+            } else {
+                todo.parentId = null;
+                todo.level = 0;
+            }
+        } else if (direction === 'demote') {
+            // Tìm sibling trước đó để làm parent
+            const siblings = this.todos.filter(t => t.parentId === todo.parentId);
+            const currentIndex = siblings.findIndex(t => t.id === id);
+            
+            if (currentIndex > 0) {
+                const newParent = siblings[currentIndex - 1];
+                todo.parentId = newParent.id;
+                todo.level = newParent.level + 1;
+            }
+        }
+
+        this.saveTodos();
+        this.render();
+        this.showMessage('Đã thay đổi cấp độ!', 'success');
     }
 
     setFilter(filter) {
@@ -119,14 +241,57 @@ class TodoApp {
     }
 
     getFilteredTodos() {
+        let filtered = [];
         switch (this.currentFilter) {
             case 'pending':
-                return this.todos.filter(t => !t.completed);
+                filtered = this.todos.filter(t => !t.completed);
+                break;
             case 'completed':
-                return this.todos.filter(t => t.completed);
+                filtered = this.todos.filter(t => t.completed);
+                break;
             default:
-                return this.todos;
+                filtered = this.todos;
         }
+        
+        // Sắp xếp theo cấu trúc phân cấp
+        return this.sortTodosHierarchically(filtered);
+    }
+
+    sortTodosHierarchically(todos) {
+        const result = [];
+        const todoMap = new Map();
+        
+        // Tạo map để dễ tìm kiếm
+        todos.forEach(todo => {
+            todoMap.set(todo.id, { ...todo, children: [] });
+        });
+        
+        // Xây dựng cây
+        const roots = [];
+        todos.forEach(todo => {
+            if (todo.parentId && todoMap.has(todo.parentId)) {
+                todoMap.get(todo.parentId).children.push(todoMap.get(todo.id));
+            } else {
+                roots.push(todoMap.get(todo.id));
+            }
+        });
+        
+        // Sắp xếp roots theo order
+        roots.sort((a, b) => a.order - b.order);
+        
+        // Duyệt cây theo thứ tự
+        const traverse = (nodes) => {
+            nodes.forEach(node => {
+                result.push(node);
+                if (node.children.length > 0) {
+                    node.children.sort((a, b) => a.order - b.order);
+                    traverse(node.children);
+                }
+            });
+        };
+        
+        traverse(roots);
+        return result;
     }
 
     render() {
@@ -143,14 +308,46 @@ class TodoApp {
         emptyState.classList.remove('show');
         
         todoList.innerHTML = filteredTodos.map(todo => `
-            <div class="todo-item" data-id="${todo.id}">
-                <div class="todo-checkbox ${todo.completed ? 'completed' : ''}" 
-                     onclick="todoApp.toggleTodo('${todo.id}')">
-                    ${todo.completed ? '<i class="fas fa-check"></i>' : ''}
+            <div class="todo-item" data-id="${todo.id}" style="margin-left: ${todo.level * 30}px;">
+                <div class="todo-content">
+                    <div class="todo-checkbox ${todo.completed ? 'completed' : ''}" 
+                         onclick="todoApp.toggleTodo('${todo.id}')">
+                        ${todo.completed ? '<i class="fas fa-check"></i>' : ''}
+                    </div>
+                    <div class="todo-text ${todo.completed ? 'completed' : ''}" 
+                         ondblclick="todoApp.editTodo('${todo.id}')">${this.escapeHtml(todo.text)}</div>
                 </div>
-                <div class="todo-text ${todo.completed ? 'completed' : ''}">${this.escapeHtml(todo.text)}</div>
                 <div class="todo-actions">
-                    <button class="delete-btn" onclick="todoApp.deleteTodo('${todo.id}')">
+                    <button class="action-btn add-sub-btn" onclick="todoApp.addSubTodo('${todo.id}')" 
+                            title="Thêm công việc con">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                    <button class="action-btn edit-btn" onclick="todoApp.editTodo('${todo.id}')" 
+                            title="Chỉnh sửa">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <div class="move-controls">
+                        <button class="action-btn move-btn" onclick="todoApp.moveTodo('${todo.id}', 'up')" 
+                                title="Di chuyển lên">
+                            <i class="fas fa-arrow-up"></i>
+                        </button>
+                        <button class="action-btn move-btn" onclick="todoApp.moveTodo('${todo.id}', 'down')" 
+                                title="Di chuyển xuống">
+                            <i class="fas fa-arrow-down"></i>
+                        </button>
+                    </div>
+                    <div class="level-controls">
+                        <button class="action-btn level-btn" onclick="todoApp.changeLevel('${todo.id}', 'promote')" 
+                                title="Nâng cấp" ${todo.level === 0 ? 'disabled' : ''}>
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <button class="action-btn level-btn" onclick="todoApp.changeLevel('${todo.id}', 'demote')" 
+                                title="Hạ cấp">
+                            <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </div>
+                    <button class="action-btn delete-btn" onclick="todoApp.deleteTodo('${todo.id}')" 
+                            title="Xóa">
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
@@ -283,9 +480,13 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
         if (window.todoApp && window.todoApp.todos.length === 0) {
             const sampleTodos = [
-                { id: '1', text: 'Học JavaScript', completed: false, createdAt: new Date().toISOString() },
-                { id: '2', text: 'Tập thể dục', completed: true, createdAt: new Date().toISOString() },
-                { id: '3', text: 'Đọc sách', completed: false, createdAt: new Date().toISOString() }
+                { id: '1', text: 'Học JavaScript', completed: false, createdAt: new Date().toISOString(), parentId: null, level: 0, order: 0 },
+                { id: '2', text: 'Tập thể dục', completed: true, createdAt: new Date().toISOString(), parentId: null, level: 0, order: 1 },
+                { id: '3', text: 'Đọc sách', completed: false, createdAt: new Date().toISOString(), parentId: null, level: 0, order: 2 },
+                { id: '4', text: 'Học React', completed: false, createdAt: new Date().toISOString(), parentId: '1', level: 1, order: 0 },
+                { id: '5', text: 'Học Node.js', completed: false, createdAt: new Date().toISOString(), parentId: '1', level: 1, order: 1 },
+                { id: '6', text: 'Chạy bộ', completed: false, createdAt: new Date().toISOString(), parentId: '2', level: 1, order: 0 },
+                { id: '7', text: 'Học Hooks', completed: false, createdAt: new Date().toISOString(), parentId: '4', level: 2, order: 0 }
             ];
             
             window.todoApp.todos = sampleTodos;
