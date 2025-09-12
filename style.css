@@ -373,6 +373,35 @@ body {
     font-size: 1rem;
     line-height: 1.5;
     word-break: break-word;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.todo-text-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.children-count {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 12px;
+    min-width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+    box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+    transition: all 0.3s ease;
+    cursor: default;
+}
+
+.children-count:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(102, 126, 234, 0.4);
 }
 
 .todo-text.completed {
@@ -694,6 +723,12 @@ body {
     
     .todo-text {
         font-size: 0.9rem;
+    }
+    
+    .children-count {
+        font-size: 0.7rem;
+        padding: 3px 6px;
+        min-width: 18px;
     }
 }
 
