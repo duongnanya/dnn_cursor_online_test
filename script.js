@@ -3,8 +3,10 @@ class TodoApp {
     constructor() {
         this.todos = this.loadTodos();
         this.currentFilter = 'all';
+        this.searchQuery = '';
         this.draggedTodo = null;
         this.dropTarget = null;
+        this.selectedTodos = new Set();
         this.init();
     }
 
@@ -37,6 +39,23 @@ class TodoApp {
         // Clear completed
         const clearBtn = document.getElementById('clearCompleted');
         clearBtn.addEventListener('click', () => this.clearCompleted());
+
+        // Search functionality
+        const searchInput = document.getElementById('searchInput');
+        const clearSearchBtn = document.getElementById('clearSearch');
+        
+        searchInput.addEventListener('input', (e) => {
+            this.setSearchQuery(e.target.value);
+        });
+        
+        clearSearchBtn.addEventListener('click', () => {
+            this.clearSearch();
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            this.handleKeyboardShortcuts(e);
+        });
     }
 
     addTodo(parentId = null) {
@@ -333,6 +352,111 @@ class TodoApp {
         }
     }
 
+    setSearchQuery(query) {
+        this.searchQuery = query.toLowerCase().trim();
+        const clearBtn = document.getElementById('clearSearch');
+        const searchInput = document.getElementById('searchInput');
+        
+        if (this.searchQuery) {
+            clearBtn.classList.add('show');
+        } else {
+            clearBtn.classList.remove('show');
+        }
+        
+        this.render();
+        this.updateStats();
+    }
+
+    clearSearch() {
+        this.searchQuery = '';
+        const searchInput = document.getElementById('searchInput');
+        const clearBtn = document.getElementById('clearSearch');
+        
+        searchInput.value = '';
+        clearBtn.classList.remove('show');
+        
+        this.render();
+        this.updateStats();
+    }
+
+    handleKeyboardShortcuts(e) {
+        // Prevent shortcuts when typing in input fields
+        if (e.target.tagName === 'INPUT') {
+            if (e.key === 'Escape') {
+                e.target.blur();
+            }
+            return;
+        }
+
+        switch (e.key) {
+            case '/':
+                e.preventDefault();
+                document.getElementById('searchInput').focus();
+                break;
+            case 'n':
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    document.getElementById('todoInput').focus();
+                }
+                break;
+            case 'Escape':
+                this.clearSearch();
+                this.selectedTodos.clear();
+                this.render();
+                break;
+            case 'a':
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    this.selectAllVisible();
+                }
+                break;
+            case 'Delete':
+            case 'Backspace':
+                if (this.selectedTodos.size > 0) {
+                    e.preventDefault();
+                    this.deleteSelected();
+                }
+                break;
+        }
+    }
+
+    selectAllVisible() {
+        const filteredTodos = this.getFilteredTodos();
+        this.selectedTodos.clear();
+        filteredTodos.forEach(todo => {
+            this.selectedTodos.add(todo.id);
+        });
+        this.render();
+        this.showMessage(`Đã chọn ${this.selectedTodos.size} công việc`, 'info');
+    }
+
+    deleteSelected() {
+        if (this.selectedTodos.size === 0) return;
+        
+        if (confirm(`Bạn có chắc muốn xóa ${this.selectedTodos.size} công việc đã chọn?`)) {
+            const selectedArray = Array.from(this.selectedTodos);
+            selectedArray.forEach(id => {
+                const todosToDelete = this.getAllChildren(id);
+                todosToDelete.push(id);
+                this.todos = this.todos.filter(t => !todosToDelete.includes(t.id));
+            });
+            
+            this.selectedTodos.clear();
+            this.saveTodos();
+            this.render();
+            this.updateStats();
+            this.showMessage(`Đã xóa ${selectedArray.length} công việc!`, 'success');
+        }
+    }
+
+    highlightSearchTerm(text) {
+        if (!this.searchQuery) return this.escapeHtml(text);
+        
+        const escaped = this.escapeHtml(text);
+        const regex = new RegExp(`(${this.escapeHtml(this.searchQuery)})`, 'gi');
+        return escaped.replace(regex, '<span class="search-highlight">$1</span>');
+    }
+
     getFilteredTodos() {
         let filtered = [];
         switch (this.currentFilter) {
@@ -344,6 +468,47 @@ class TodoApp {
                 break;
             default:
                 filtered = this.todos;
+        }
+        
+        // Apply search filter
+        if (this.searchQuery) {
+            filtered = filtered.filter(todo => 
+                todo.text.toLowerCase().includes(this.searchQuery)
+            );
+            
+            // Also include parents of matching children
+            const matchingIds = new Set(filtered.map(t => t.id));
+            const additionalParents = new Set();
+            
+            filtered.forEach(todo => {
+                let currentParentId = todo.parentId;
+                while (currentParentId) {
+                    const parent = this.todos.find(t => t.id === currentParentId);
+                    if (parent && !matchingIds.has(parent.id)) {
+                        additionalParents.add(parent.id);
+                        matchingIds.add(parent.id);
+                    }
+                    currentParentId = parent ? parent.parentId : null;
+                }
+            });
+            
+            // Add parents to filtered list
+            additionalParents.forEach(parentId => {
+                const parent = this.todos.find(t => t.id === parentId);
+                if (parent) {
+                    // Check if parent matches current filter
+                    switch (this.currentFilter) {
+                        case 'pending':
+                            if (!parent.completed) filtered.push(parent);
+                            break;
+                        case 'completed':
+                            if (parent.completed) filtered.push(parent);
+                            break;
+                        default:
+                            filtered.push(parent);
+                    }
+                }
+            });
         }
         
         // Sắp xếp theo cấu trúc phân cấp
@@ -419,7 +584,7 @@ class TodoApp {
                     </div>
                     <div class="todo-text ${todo.completed ? 'completed' : ''}" 
                          ondblclick="todoApp.editTodo('${todo.id}')">
-                        <span class="todo-text-content">${this.escapeHtml(todo.text)}</span>
+                        <span class="todo-text-content">${this.highlightSearchTerm(todo.text)}</span>
                         ${this.hasChildren(todo.id) ? `<span class="children-count">${this.getChildrenCount(todo.id)}</span>` : ''}
                     </div>
                 </div>
@@ -444,11 +609,51 @@ class TodoApp {
     updateStats() {
         const totalTasks = document.getElementById('totalTasks');
         const clearBtn = document.getElementById('clearCompleted');
+        const filteredStats = document.getElementById('filteredStats');
         
         totalTasks.textContent = this.todos.length;
         
         const completedCount = this.todos.filter(t => t.completed).length;
         clearBtn.disabled = completedCount === 0;
+        
+        // Update filtered stats
+        const filteredTodos = this.getFilteredTodos();
+        if (this.searchQuery) {
+            filteredStats.textContent = `(${filteredTodos.length} kết quả)`;
+            filteredStats.style.display = 'inline';
+        } else {
+            filteredStats.style.display = 'none';
+        }
+        
+        // Update progress
+        this.updateProgress();
+    }
+
+    updateProgress() {
+        const totalCount = this.todos.length;
+        const completedCount = this.todos.filter(t => t.completed).length;
+        const percentage = totalCount === 0 ? 0 : Math.round((completedCount / totalCount) * 100);
+        
+        const progressFill = document.getElementById('progressFill');
+        const progressPercentage = document.getElementById('progressPercentage');
+        const completedCountEl = document.getElementById('completedCount');
+        const totalCountEl = document.getElementById('totalCount');
+        
+        if (progressFill) {
+            progressFill.style.width = `${percentage}%`;
+        }
+        
+        if (progressPercentage) {
+            progressPercentage.textContent = `${percentage}%`;
+        }
+        
+        if (completedCountEl) {
+            completedCountEl.textContent = completedCount;
+        }
+        
+        if (totalCountEl) {
+            totalCountEl.textContent = totalCount;
+        }
     }
 
     showMessage(message, type = 'info') {

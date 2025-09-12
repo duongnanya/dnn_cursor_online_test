@@ -12,17 +12,44 @@
 - [x] **Chỉnh sửa todo** - double-click hoặc nút edit với prompt
 - [x] **Validation input** - không rỗng, tối đa 100 ký tự
 
+### ✅ Tìm kiếm & Lọc nâng cao
+- [x] **Search functionality** - tìm kiếm theo nội dung todo
+- [x] **Search highlighting** - highlight từ khóa trong kết quả
+- [x] **Smart parent inclusion** - bao gồm todo cha khi con match
+- [x] **Clear search** - nút X để xóa tìm kiếm
+- [x] **Search stats** - hiển thị số kết quả tìm được
+- [x] **Real-time search** - tìm kiếm ngay khi gõ
+
 ### ✅ Hệ thống lọc
 - [x] **Filter "Tất cả"** - hiển thị tất cả todo
 - [x] **Filter "Chưa hoàn thành"** - chỉ pending todos
 - [x] **Filter "Đã hoàn thành"** - chỉ completed todos
 - [x] **Active filter button** - highlight filter đang chọn
 
-### ✅ Thống kê & UI
+### ✅ Thống kê & Progress Tracking
 - [x] **Đếm tổng số todo** - hiển thị số lượng
 - [x] **Empty state** - hiển thị khi không có todo
 - [x] **Clear completed** - xóa tất cả todo đã hoàn thành
 - [x] **Disable clear button** - khi không có todo completed
+- [x] **Progress bar** - thanh tiến độ với animation
+- [x] **Progress percentage** - phần trăm hoàn thành
+- [x] **Completed/Total count** - x/y công việc
+- [x] **Visual progress** - gradient fill với hiệu ứng
+
+### ✅ Keyboard Shortcuts
+- [x] **/ key** - focus vào search input
+- [x] **Ctrl+N** - focus vào todo input để thêm mới
+- [x] **Ctrl+A** - chọn tất cả todo hiển thị
+- [x] **Escape** - clear search, clear selection, blur inputs
+- [x] **Delete/Backspace** - xóa các todo đã chọn
+- [x] **Input field handling** - prevent shortcuts khi đang gõ
+
+### ✅ Bulk Operations (Thao tác hàng loạt)
+- [x] **Multi-selection** - chọn nhiều todo cùng lúc
+- [x] **Select all visible** - chọn tất cả todo đang hiển thị
+- [x] **Bulk delete** - xóa nhiều todo cùng lúc
+- [x] **Selection state management** - quản lý trạng thái chọn
+- [x] **Confirmation dialogs** - xác nhận trước khi xóa nhiều
 
 ## 🌳 TÍNH NĂNG PHÂN CẤP (HIERARCHICAL)
 
@@ -92,6 +119,13 @@
   order: number         // thứ tự trong cùng level
 }
 ```
+
+### ✅ Advanced State Management
+- [x] **Search query state** - this.searchQuery
+- [x] **Selected todos state** - this.selectedTodos (Set)
+- [x] **Filter state** - this.currentFilter
+- [x] **Drag state** - draggedTodo, dropTarget
+- [x] **Persistent state** - localStorage integration
 
 ## 🎭 UI/UX FEATURES
 
@@ -164,6 +198,12 @@
 
 ## 🎯 DEMO DATA
 
+### ✅ Help & Documentation
+- [x] **Keyboard shortcuts help** - trong empty state
+- [x] **Mouse interactions help** - hướng dẫn drag/drop, double-click
+- [x] **Visual cues** - tooltips, placeholders
+- [x] **Feature discovery** - progressive disclosure
+
 ### ✅ Sample todos (nếu empty)
 - [x] **Học JavaScript** (parent)
   - [x] **Học React** (child level 1)
@@ -185,6 +225,10 @@
 4. ✅ **PHẢI cập nhật** checklist này nếu có tính năng mới
 
 **Các tính năng KHÔNG ĐƯỢC phép bỏ qua:**
+- Search functionality với highlighting
+- Keyboard shortcuts system
+- Bulk operations (multi-select, bulk delete)
+- Progress tracking với progress bar
 - Drag & Drop functionality
 - Hierarchical structure 
 - All animations and transitions
@@ -192,6 +236,7 @@
 - Responsive design
 - LocalStorage persistence
 - All UI/UX enhancements
+- Help documentation trong empty state
 
 ---
 

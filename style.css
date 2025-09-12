@@ -113,6 +113,82 @@ body {
     transform: translateY(0);
 }
 
+/* Search Section */
+.search-section {
+    padding: 20px 30px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.search-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+#searchInput {
+    flex: 1;
+    padding: 12px 45px 12px 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 25px;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    background: #f8f9fa;
+}
+
+#searchInput:focus {
+    outline: none;
+    border-color: #667eea;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+#searchInput:not(:placeholder-shown) {
+    background: white;
+    border-color: #667eea;
+}
+
+.clear-search-btn {
+    position: absolute;
+    right: 5px;
+    background: none;
+    border: none;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    cursor: pointer;
+    color: #999;
+    transition: all 0.3s ease;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.clear-search-btn:hover {
+    background: #f0f0f0;
+    color: #667eea;
+}
+
+.clear-search-btn.show {
+    display: flex;
+}
+
+.filtered-stats {
+    margin-left: 10px;
+    color: #667eea;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.search-highlight {
+    background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-weight: 600;
+    color: #856404;
+}
+
 /* Filter Section */
 .filter-section {
     padding: 20px 30px;
@@ -122,6 +198,71 @@ body {
     align-items: center;
     flex-wrap: wrap;
     gap: 15px;
+}
+
+/* Progress Section */
+.progress-section {
+    padding: 20px 30px;
+    border-bottom: 1px solid #e0e0e0;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.05));
+}
+
+.progress-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.progress-text {
+    font-weight: 600;
+    color: #667eea;
+    font-size: 0.9rem;
+}
+
+.progress-percentage {
+    font-weight: 700;
+    color: #667eea;
+    font-size: 1.1rem;
+}
+
+.progress-bar {
+    height: 8px;
+    background: #e0e0e0;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 8px;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 10px;
+    transition: width 0.6s ease;
+    position: relative;
+    box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+}
+
+.progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, 
+        rgba(255,255,255,0.3) 0%, 
+        rgba(255,255,255,0.1) 50%, 
+        rgba(255,255,255,0.3) 100%);
+    border-radius: 10px;
+}
+
+.progress-details {
+    text-align: center;
+    color: #666;
+    font-size: 0.85rem;
+    font-weight: 500;
 }
 
 .filter-buttons {
@@ -662,7 +803,9 @@ body {
     }
     
     .input-section,
+    .search-section,
     .filter-section,
+    .progress-section,
     .todo-list,
     .footer {
         padding-left: 20px;
