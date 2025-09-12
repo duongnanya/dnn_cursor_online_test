@@ -65,7 +65,8 @@ class TodoApp {
             createdAt: new Date().toISOString(),
             parentId: parentId,
             level: parentLevel + 1,
-            order: order
+            order: order,
+            collapsed: false
         };
 
         this.todos.unshift(todo);
@@ -126,6 +127,15 @@ class TodoApp {
         return this.todos.some(todo => todo.parentId === parentId);
     }
 
+    toggleChildren(parentId) {
+        const parentTodo = this.todos.find(t => t.id === parentId);
+        if (parentTodo) {
+            parentTodo.collapsed = !parentTodo.collapsed;
+            this.saveTodos();
+            this.render();
+        }
+    }
+
     addSubTodo(parentId) {
         const parentTodo = this.todos.find(t => t.id === parentId);
         if (!parentTodo) return;
@@ -149,7 +159,8 @@ class TodoApp {
                 createdAt: new Date().toISOString(),
                 parentId: parentId,
                 level: parentLevel + 1,
-                order: order
+                order: order,
+                collapsed: false
             };
 
             this.todos.unshift(todo);
@@ -372,11 +383,11 @@ class TodoApp {
         // Sắp xếp roots theo order
         roots.sort((a, b) => a.order - b.order);
         
-        // Duyệt cây theo thứ tự
+        // Duyệt cây theo thứ tự, ẩn children nếu parent bị collapsed
         const traverse = (nodes) => {
             nodes.forEach(node => {
                 result.push(node);
-                if (node.children.length > 0) {
+                if (node.children.length > 0 && !node.collapsed) {
                     node.children.sort((a, b) => a.order - b.order);
                     traverse(node.children);
                 }
@@ -420,7 +431,12 @@ class TodoApp {
                     <div class="todo-text ${todo.completed ? 'completed' : ''}" 
                          ondblclick="todoApp.editTodo('${todo.id}')">
                         <span class="todo-text-content">${this.escapeHtml(todo.text)}</span>
-                        ${this.hasChildren(todo.id) ? `<span class="children-count">${this.getChildrenCount(todo.id)}</span>` : ''}
+                        ${this.hasChildren(todo.id) ? `
+                            <span class="children-count" onclick="event.stopPropagation(); todoApp.toggleChildren('${todo.id}')" title="Ấn để đóng/mở">
+                                <i class="fas fa-chevron-${todo.collapsed ? 'right' : 'down'}"></i>
+                                <span class="count-number">${this.getChildrenCount(todo.id)}</span>
+                            </span>
+                        ` : ''}
                     </div>
                 </div>
                 <div class="todo-actions">
@@ -566,13 +582,13 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
         if (window.todoApp && window.todoApp.todos.length === 0) {
             const sampleTodos = [
-                { id: '1', text: 'Học JavaScript', completed: false, createdAt: new Date().toISOString(), parentId: null, level: 0, order: 0 },
-                { id: '2', text: 'Tập thể dục', completed: true, createdAt: new Date().toISOString(), parentId: null, level: 0, order: 1 },
-                { id: '3', text: 'Đọc sách', completed: false, createdAt: new Date().toISOString(), parentId: null, level: 0, order: 2 },
-                { id: '4', text: 'Học React', completed: false, createdAt: new Date().toISOString(), parentId: '1', level: 1, order: 0 },
-                { id: '5', text: 'Học Node.js', completed: false, createdAt: new Date().toISOString(), parentId: '1', level: 1, order: 1 },
-                { id: '6', text: 'Chạy bộ', completed: false, createdAt: new Date().toISOString(), parentId: '2', level: 1, order: 0 },
-                { id: '7', text: 'Học Hooks', completed: false, createdAt: new Date().toISOString(), parentId: '4', level: 2, order: 0 }
+                { id: '1', text: 'Học JavaScript', completed: false, createdAt: new Date().toISOString(), parentId: null, level: 0, order: 0, collapsed: false },
+                { id: '2', text: 'Tập thể dục', completed: true, createdAt: new Date().toISOString(), parentId: null, level: 0, order: 1, collapsed: false },
+                { id: '3', text: 'Đọc sách', completed: false, createdAt: new Date().toISOString(), parentId: null, level: 0, order: 2, collapsed: false },
+                { id: '4', text: 'Học React', completed: false, createdAt: new Date().toISOString(), parentId: '1', level: 1, order: 0, collapsed: false },
+                { id: '5', text: 'Học Node.js', completed: false, createdAt: new Date().toISOString(), parentId: '1', level: 1, order: 1, collapsed: false },
+                { id: '6', text: 'Chạy bộ', completed: false, createdAt: new Date().toISOString(), parentId: '2', level: 1, order: 0, collapsed: false },
+                { id: '7', text: 'Học Hooks', completed: false, createdAt: new Date().toISOString(), parentId: '4', level: 2, order: 0, collapsed: false }
             ];
             
             window.todoApp.todos = sampleTodos;

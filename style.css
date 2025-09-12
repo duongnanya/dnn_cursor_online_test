@@ -396,12 +396,26 @@ body {
     flex-shrink: 0;
     box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
     transition: all 0.3s ease;
-    cursor: default;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    user-select: none;
 }
 
 .children-count:hover {
     transform: scale(1.1);
     box-shadow: 0 4px 8px rgba(102, 126, 234, 0.4);
+    background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+}
+
+.children-count i {
+    font-size: 0.7rem;
+    transition: transform 0.3s ease;
+}
+
+.count-number {
+    font-weight: 600;
 }
 
 .todo-text.completed {
@@ -729,6 +743,11 @@ body {
         font-size: 0.7rem;
         padding: 3px 6px;
         min-width: 18px;
+        gap: 2px;
+    }
+    
+    .children-count i {
+        font-size: 0.6rem;
     }
 }
 
