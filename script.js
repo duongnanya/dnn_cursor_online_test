@@ -391,7 +391,7 @@ class TodoApp {
         emptyState.classList.remove('show');
         
         todoList.innerHTML = filteredTodos.map(todo => `
-            <div class="todo-item" data-id="${todo.id}" style="margin-left: ${todo.level * 30}px;" 
+            <div class="todo-item ${todo.level > 0 ? `level-${todo.level}` : ''}" data-id="${todo.id}" 
                  draggable="true" 
                  ondragstart="todoApp.handleDragStart(event)"
                  ondragover="todoApp.handleDragOver(event)"
