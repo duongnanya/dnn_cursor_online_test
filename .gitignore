@@ -1,5 +1,5 @@
 # Firebase Configuration (chứa thông tin nhạy cảm)
-firebase-config.js
+# firebase-config.js - Commented out to allow template file
 
 # Node modules
 node_modules/
