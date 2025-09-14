@@ -6,66 +6,131 @@
     <title>Todo List Phân Cấp - Quản Lý Công Việc</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Firebase Configuration -->
+    <script src="firebase-config.js" onerror="handleFirebaseConfigError()"></script>
+    
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth, GoogleAuthProvider } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        
+        // Function xử lý lỗi khi không load được config
+        window.handleFirebaseConfigError = function() {
+            console.warn('Firebase config file not found. Using demo config.');
+            
+            // Demo config (fallback)
+            window.firebaseConfig = {
+                apiKey: "demo-api-key",
+                authDomain: "demo-project.firebaseapp.com",
+                projectId: "demo-project",
+                storageBucket: "demo-project.appspot.com",
+                messagingSenderId: "123456789",
+                appId: "1:123456789:web:demo"
+            };
+            
+            // Đánh dấu là demo mode
+            window.isDemoMode = true;
+        };
+        
+        // Kiểm tra nếu chưa có config
+        if (!window.firebaseConfig) {
+            window.handleFirebaseConfigError();
+        }
+        
+        // Khởi tạo Firebase
+        const app = initializeApp(window.firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const googleProvider = new GoogleAuthProvider();
+        
+        // Export để sử dụng trong script.js
+        window.firebaseAuth = auth;
+        window.firebaseDB = db;
+        window.googleProvider = googleProvider;
+    </script>
 </head>
 <body>
     <div class="container">
-        <div class="todo-app">
-            <div class="header">
-                <h1><i class="fas fa-sitemap"></i> Todo List Phân Cấp</h1>
-                <p>Quản lý công việc với cấu trúc cha-con lồng nhau vô hạn</p>
-            </div>
-            
-            <div class="input-section">
-                <div class="input-container">
-                    <input type="text" id="todoInput" placeholder="Thêm công việc mới..." maxlength="100">
-                    <button id="addBtn" class="add-btn">
-                        <i class="fas fa-plus"></i>
-                    </button>
+        <!-- Login Screen -->
+        <div class="login-screen" id="loginScreen">
+            <div class="login-container">
+                <div class="login-header">
+                    <i class="fas fa-tasks"></i>
+                    <h1>Todo List Phân Cấp</h1>
+                    <p>Đăng nhập để đồng bộ dữ liệu của bạn</p>
+                </div>
+                <button class="google-login-btn" id="googleLoginBtn">
+                    <i class="fab fa-google"></i>
+                    Đăng nhập bằng Google
+                </button>
+                <div class="login-info">
+                    <p><i class="fas fa-info-circle"></i> Dữ liệu sẽ được lưu trữ an toàn trên Firebase</p>
                 </div>
             </div>
-            
-            <div class="search-section">
+        </div>
+
+        <!-- Main App -->
+        <div class="todo-app" id="todoApp" style="display: none;">            
+            <div class="filter-section">
                 <div class="search-container">
                     <input type="text" id="searchInput" placeholder="Tìm kiếm công việc..." maxlength="50">
                     <button id="clearSearch" class="clear-search-btn" title="Xóa tìm kiếm">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
-            </div>
-            
-            <div class="filter-section">
                 <div class="filter-buttons">
                     <button class="filter-btn active" data-filter="all">
                         <i class="fas fa-list"></i> Tất cả
                     </button>
                     <button class="filter-btn" data-filter="pending">
-                        <i class="fas fa-clock"></i> Chưa hoàn thành
+                        <i class="fas fa-clock"></i> Còn
                     </button>
                     <button class="filter-btn" data-filter="completed">
-                        <i class="fas fa-check"></i> Đã hoàn thành
+                        <i class="fas fa-check"></i> Xong
                     </button>
                 </div>
-                <div class="stats">
-                    <span id="totalTasks">0</span> công việc
-                    <span id="filteredStats" class="filtered-stats"></span>
+                <button class="create-project-btn planner-only" onclick="todoApp.createProject()">
+                    <i class="fas fa-plus"></i> Tạo Project
+                </button>
+                <button class="calendar-btn" onclick="todoApp.goToCalendar()">
+                    <i class="fas fa-calendar-alt"></i> Calendar
+                </button>
+                <div class="planner-mode-toggle">
+                    <input type="checkbox" id="plannerMode" class="planner-mode-checkbox">
+                    <label for="plannerMode" class="planner-mode-label">
+                        <i class="fas fa-sitemap"></i> Planner Mode
+                    </label>
+                </div>
+                
+                <!-- User Avatar với Menu -->
+                <div class="user-avatar-container">
+                    <img id="userAvatar" src="" alt="Avatar" class="user-avatar" title="Menu người dùng">
+                    <div class="user-menu" id="userMenu">
+                        <div class="user-info-header">
+                            <img id="userMenuAvatar" src="" alt="Avatar" class="user-menu-avatar">
+                            <div class="user-details">
+                                <span id="userName" class="user-name"></span>
+                                <span id="userEmail" class="user-email"></span>
+                            </div>
+                        </div>
+                        <div class="menu-divider"></div>
+                        <button class="menu-item" id="syncBtn">
+                            <i class="fas fa-sync-alt"></i>
+                            Đồng bộ dữ liệu
+                        </button>
+                        <button class="menu-item" id="logoutBtn">
+                            <i class="fas fa-sign-out-alt"></i>
+                            Đăng xuất
+                        </button>
+                    </div>
                 </div>
             </div>
             
-            <div class="progress-section">
-                <div class="progress-info">
-                    <span class="progress-text">Tiến độ hoàn thành</span>
-                    <span class="progress-percentage" id="progressPercentage">0%</span>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progressFill"></div>
-                </div>
-                <div class="progress-details">
-                    <span id="completedCount">0</span> / <span id="totalCount">0</span> công việc
-                </div>
-            </div>
             
-            <div class="todo-list" id="todoList">
-                <!-- Danh sách công việc sẽ được thêm vào đây -->
+            <div class="multi-project-container" id="multiProjectContainer">
+                <!-- Todos của từng project sẽ được render ở đây -->
             </div>
             
             <div class="empty-state" id="emptyState">
@@ -92,11 +157,6 @@
                 </div>
             </div>
             
-            <div class="footer">
-                <button id="clearCompleted" class="clear-btn">
-                    <i class="fas fa-trash"></i> Xóa đã hoàn thành
-                </button>
-            </div>
         </div>
     </div>
     

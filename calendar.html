@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendar - Todo List Phân Cấp</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="calendar.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <div class="todo-app">
+            <div class="filter-section">
+                <button class="back-btn" onclick="calendarApp.goBack()">
+                    <i class="fas fa-arrow-left"></i> Quay lại
+                </button>
+                <div class="calendar-controls">
+                    <button class="nav-btn" onclick="calendarApp.previousMonth()">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <h2 id="currentMonth"></h2>
+                    <button class="nav-btn" onclick="calendarApp.nextMonth()">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+                <div class="calendar-actions">
+                    <div class="view-toggle">
+                        <button class="view-btn active" id="monthViewBtn" onclick="calendarApp.setView('month')">
+                            <i class="fas fa-calendar-alt"></i> Tháng
+                        </button>
+                        <div class="week-dropdown">
+                            <button class="view-btn" id="weekViewBtn" onclick="calendarApp.toggleWeekDropdown()">
+                                <i class="fas fa-calendar-week"></i> <span id="weekModeText">Tuần 624</span>
+                                <i class="fas fa-chevron-down dropdown-arrow"></i>
+                            </button>
+                            <div class="week-dropdown-menu" id="weekDropdownMenu">
+                                <div class="week-mode-item" onclick="calendarApp.setWeekMode('normal')">
+                                    <i class="fas fa-calendar-week"></i> Tuần
+                                    <small>24h, highlight ngoài 8-17h</small>
+                                </div>
+                                <div class="week-mode-item" onclick="calendarApp.setWeekMode('85')">
+                                    <i class="fas fa-business-time"></i> Tuần 85
+                                    <small>8-17h, highlight 12-1h</small>
+                                </div>
+                                <div class="week-mode-item" onclick="calendarApp.setWeekMode('624')">
+                                    <i class="fas fa-clock"></i> Tuần 624
+                                    <small>6-24h, highlight 6-8h, 12-1h & 17h+</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="today-btn" onclick="calendarApp.goToToday()">
+                        <i class="fas fa-calendar-day"></i> Hôm nay
+                    </button>
+                </div>
+            </div>
+            
+            <div class="calendar-container">
+                <div class="calendar-header" id="calendarHeader">
+                    <div class="week-number-header">Tuần</div>
+                    <div class="day-header">CN</div>
+                    <div class="day-header">T2</div>
+                    <div class="day-header">T3</div>
+                    <div class="day-header">T4</div>
+                    <div class="day-header">T5</div>
+                    <div class="day-header">T6</div>
+                    <div class="day-header">T7</div>
+                </div>
+                <div class="calendar-grid" id="calendarGrid">
+                    <!-- Calendar days will be rendered here -->
+                </div>
+            </div>
+            
+            <div class="calendar-legend">
+                <div class="legend-item">
+                    <div class="legend-color completed"></div>
+                    <span>Đã hoàn thành</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color pending"></div>
+                    <span>Chưa hoàn thành</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color today"></div>
+                    <span>Hôm nay</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+    <script src="calendar.js"></script>
+</body>
+</html>

@@ -9,47 +9,260 @@ body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     min-height: 100vh;
-    padding: 20px;
+    padding: 0;
+    margin: 0;
     color: #333;
 }
 
 .container {
-    max-width: 600px;
-    margin: 0 auto;
+    width: 100%;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+}
+
+/* Login Screen */
+.login-screen {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.login-container {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 40px;
+    text-align: center;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    max-width: 400px;
+    width: 90%;
+}
+
+.login-header {
+    margin-bottom: 30px;
+}
+
+.login-header i {
+    font-size: 3rem;
+    color: #667eea;
+    margin-bottom: 15px;
+}
+
+.login-header h1 {
+    color: #333;
+    margin-bottom: 10px;
+    font-size: 1.8rem;
+}
+
+.login-header p {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.google-login-btn {
+    background: #4285f4;
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    border-radius: 10px;
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    transition: all 0.3s ease;
+    margin-bottom: 20px;
+}
+
+.google-login-btn:hover {
+    background: #3367d6;
+    transform: translateY(-2px);
+}
+
+.google-login-btn i {
+    font-size: 1.2rem;
+}
+
+.login-info {
+    color: #666;
+    font-size: 0.8rem;
+}
+
+.login-info i {
+    color: #4285f4;
+    margin-right: 5px;
+}
+
+/* User Avatar Container */
+.user-avatar-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+    order: 7;
+}
+
+.user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.user-avatar:hover {
+    border-color: rgba(255, 255, 255, 0.6);
+    transform: scale(1.05);
+}
+
+/* User Menu */
+.user-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    min-width: 250px;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: all 0.3s ease;
+    margin-top: 8px;
+}
+
+.user-menu.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.user-info-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px 12px 0 0;
+}
+
+.user-menu-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.user-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.user-name {
+    color: white;
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.user-email {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.85rem;
+}
+
+.menu-divider {
+    height: 1px;
+    background: #e0e0e0;
+    margin: 0;
+}
+
+.menu-item {
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 12px 16px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #333;
+    font-size: 0.9rem;
+}
+
+.menu-item:hover {
+    background: #f5f5f5;
+}
+
+.menu-item i {
+    width: 16px;
+    text-align: center;
+}
+
+.menu-item.syncing i {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Loading Message */
+.loading-message {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    text-align: center;
+    color: #666;
+}
+
+.loading-spinner {
+    font-size: 2rem;
+    color: #667eea;
+    margin-bottom: 20px;
+}
+
+.loading-text {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: #888;
 }
 
 /* Todo App Container */
 .todo-app {
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
-    border-radius: 20px;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
     overflow: hidden;
-    animation: slideUp 0.6s ease-out;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    max-height: 100vh;
 }
 
-@keyframes slideUp {
-    from {
-        opacity: 0;
-        transform: translateY(30px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
 
 /* Header */
 .header {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    padding: 30px;
+    padding: 20px 30px;
     text-align: center;
+    flex-shrink: 0;
 }
 
 .header h1 {
-    font-size: 2.5rem;
-    margin-bottom: 10px;
+    font-size: 1.8rem;
+    margin-bottom: 8px;
     font-weight: 700;
 }
 
@@ -60,63 +273,126 @@ body {
 
 .header p {
     opacity: 0.9;
-    font-size: 1.1rem;
+    font-size: 0.9rem;
+    margin-bottom: 15px;
 }
 
-/* Input Section */
-.input-section {
-    padding: 30px;
-    border-bottom: 1px solid #e0e0e0;
-}
-
-.input-container {
-    display: flex;
-    gap: 15px;
-    align-items: center;
-}
-
-#todoInput {
-    flex: 1;
-    padding: 15px 20px;
-    border: 2px solid #e0e0e0;
-    border-radius: 12px;
-    font-size: 1rem;
-    transition: all 0.3s ease;
-    background: #f8f9fa;
-}
-
-#todoInput:focus {
-    outline: none;
-    border-color: #667eea;
-    background: white;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.add-btn {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+.create-project-btn {
+    background: #667eea;
     color: white;
-    border: none;
-    padding: 15px 20px;
-    border-radius: 12px;
+    border: 2px solid #667eea;
+    padding: 8px 16px;
+    border-radius: 20px;
     cursor: pointer;
     transition: all 0.3s ease;
-    font-size: 1.2rem;
-    min-width: 60px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    order: 4;
 }
 
-.add-btn:hover {
+.create-project-btn:hover {
+    background: #5a6fd8;
+    border-color: #5a6fd8;
     transform: translateY(-2px);
-    box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
-.add-btn:active {
-    transform: translateY(0);
+.calendar-btn {
+    background: #4CAF50;
+    color: white;
+    border: 2px solid #4CAF50;
+    padding: 8px 16px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.9rem;
+    font-weight: 600;
+    order: 5;
 }
 
-/* Search Section */
-.search-section {
-    padding: 20px 30px;
-    border-bottom: 1px solid #e0e0e0;
+.calendar-btn:hover {
+    background: #45a049;
+    border-color: #45a049;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+/* Planner Mode Toggle */
+.planner-mode-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    order: 6;
+}
+
+.planner-mode-checkbox {
+    display: none;
+}
+
+.planner-mode-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border: 2px solid #e0e0e0;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #666;
+}
+
+.planner-mode-label:hover {
+    background: #e9ecef;
+    border-color: #667eea;
+}
+
+.planner-mode-checkbox:checked + .planner-mode-label {
+    background: #667eea;
+    border-color: #667eea;
+    color: white;
+}
+
+.planner-mode-checkbox:checked + .planner-mode-label:hover {
+    background: #5a6fd8;
+    border-color: #5a6fd8;
+}
+
+
+/* Add Todo Button */
+.add-todo-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+}
+
+.add-todo-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: scale(1.1);
+}
+
+
+/* Search Container in Filter Section */
+.filter-section .search-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+    max-width: 300px;
+    order: 1;
 }
 
 .search-container {
@@ -174,12 +450,6 @@ body {
     display: flex;
 }
 
-.filtered-stats {
-    margin-left: 10px;
-    color: #667eea;
-    font-weight: 600;
-    font-size: 0.85rem;
-}
 
 .search-highlight {
     background: linear-gradient(135deg, #fff3cd, #ffeaa7);
@@ -191,20 +461,22 @@ body {
 
 /* Filter Section */
 .filter-section {
-    padding: 20px 30px;
+    padding: 10px 30px;
     border-bottom: 1px solid #e0e0e0;
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: center;
     flex-wrap: wrap;
     gap: 15px;
+    flex-shrink: 0;
 }
 
 /* Progress Section */
 .progress-section {
-    padding: 20px 30px;
+    padding: 10px 30px;
     border-bottom: 1px solid #e0e0e0;
     background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.05));
+    flex-shrink: 0;
 }
 
 .progress-info {
@@ -269,6 +541,7 @@ body {
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
+    order: 2;
 }
 
 .filter-btn {
@@ -293,17 +566,167 @@ body {
     border-color: transparent;
 }
 
-.stats {
-    color: #666;
+
+/* Multi Project Container */
+.multi-project-container {
+    display: flex;
+    gap: 20px;
+    padding: 20px 30px;
+    overflow-x: auto;
+    flex: 1;
+    min-height: calc(100vh - 80px);
+    background: #f8f9fa;
+    transition: background-color 0.3s ease;
+    cursor: pointer;
+    position: relative;
+}
+
+/* Darker background in planner mode */
+.planner-mode-on .multi-project-container {
+    background: #e9ecef;
+}
+
+.multi-project-container::-webkit-scrollbar {
+    height: 8px;
+}
+
+.multi-project-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.multi-project-container::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 4px;
+}
+
+.multi-project-container::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+
+/* Project Column */
+.project-column {
+    min-width: 350px;
+    max-width: 400px;
+    flex: 1;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    border: 2px solid #f0f0f0;
+    display: flex;
+    flex-direction: column;
+    cursor: default;
+}
+
+.project-header-small {
+    padding: 15px 20px;
+    color: white;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 60px;
+    flex-shrink: 0;
+}
+
+.project-title-small {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 0;
+    flex: 1;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.project-todo-count-small {
+    font-size: 0.8rem;
+    opacity: 0.8;
     font-weight: 500;
-    font-size: 0.9rem;
+    margin-left: 4px;
+}
+
+/* Project Header Content */
+.project-header-content {
+    display: flex;
+    align-items: center;
+    flex: 1;
+}
+
+/* Project Actions */
+.project-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+/* Project Management Actions */
+.project-management-actions {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.project-action-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+}
+
+.project-action-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: scale(1.1);
+}
+
+.edit-project-btn:hover {
+    background: rgba(33, 150, 243, 0.8);
+    border-color: rgba(33, 150, 243, 1);
+}
+
+.archive-project-btn:hover {
+    background: rgba(255, 152, 0, 0.8);
+    border-color: rgba(255, 152, 0, 1);
+}
+
+.delete-project-btn:hover {
+    background: rgba(244, 67, 54, 0.8);
+    border-color: rgba(244, 67, 54, 1);
 }
 
 /* Todo List */
 .todo-list {
-    max-height: 500px;
+    flex: 1;
     overflow-y: auto;
-    padding: 0 30px;
+    padding: 0;
+    min-height: 300px;
+}
+
+.empty-project {
+    text-align: center;
+    padding: 40px 20px;
+    color: #999;
+}
+
+.empty-project i {
+    font-size: 2rem;
+    margin-bottom: 10px;
+    color: #ddd;
+}
+
+.empty-project p {
+    margin: 0;
+    font-size: 0.9rem;
 }
 
 /* Hierarchical Structure */
@@ -453,18 +876,16 @@ body {
 .todo-item {
     display: flex;
     align-items: center;
-    padding: 15px 0;
+    padding: 15px 20px;
     border-bottom: 1px solid #f0f0f0;
-    animation: fadeIn 0.3s ease-in;
     transition: all 0.3s ease;
     position: relative;
+    min-height: 60px; /* Cố định height tối thiểu */
+    height: 60px; /* Cố định height */
 }
 
 .todo-item:hover {
     background: rgba(102, 126, 234, 0.05);
-    margin: 0 -30px;
-    padding-left: 30px;
-    padding-right: 30px;
 }
 
 .todo-content {
@@ -472,18 +893,10 @@ body {
     align-items: center;
     flex: 1;
     min-width: 0;
+    position: relative;
+    height: 100%; /* Chiếm hết height của todo-item */
 }
 
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateX(-20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
-}
 
 .todo-checkbox {
     width: 24px;
@@ -516,8 +929,8 @@ body {
     word-break: break-word;
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 10px;
+    height: 100%; /* Chiếm hết height của todo-content */
 }
 
 .todo-text-content {
@@ -537,11 +950,40 @@ body {
     flex-shrink: 0;
     box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
     transition: all 0.3s ease;
-    cursor: default;
+    cursor: pointer;
+    margin-left: auto;
+    margin-right: 10px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border: 2px solid transparent; /* Thêm border transparent để giữ height cố định */
+    min-height: 24px; /* Đảm bảo height tối thiểu */
+    height: 24px; /* Cố định height */
+}
+
+.children-count.expanded {
+    background: transparent;
+    color: #667eea;
+    border: 2px solid #667eea;
+    box-shadow: none;
+}
+
+.children-count.collapsed {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: 2px solid transparent; /* Giữ border transparent cho collapsed */
 }
 
 .children-count:hover {
     transform: scale(1.1);
+}
+
+.children-count.expanded:hover {
+    background: rgba(102, 126, 234, 0.1);
+    border-color: #4a5bb8;
+}
+
+.children-count.collapsed:hover {
     box-shadow: 0 4px 8px rgba(102, 126, 234, 0.4);
 }
 
@@ -555,13 +997,59 @@ body {
     display: flex;
     gap: 5px;
     opacity: 0;
+    visibility: hidden;
     transition: all 0.3s ease;
     align-items: center;
     flex-wrap: wrap;
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.95);
+    padding: 4px 8px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    height: 32px; /* Cố định height cho actions */
 }
 
-.todo-item:hover .todo-actions {
+.todo-actions.show {
     opacity: 1;
+    visibility: visible;
+}
+
+/* Show actions when planner mode is on and todo is hovered, but not in parent selection mode */
+.planner-mode-on:not(.parent-selection-mode) .todo-item:hover .todo-actions {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Hide children-count in parent selection mode */
+.parent-selection-mode .children-count {
+    display: none !important;
+}
+
+/* Hide children-count in planner mode */
+.planner-mode-on .children-count {
+    display: none !important;
+}
+
+/* Hide create project button when not in planner mode */
+.create-project-btn.planner-only {
+    display: none;
+}
+
+.planner-mode-on .create-project-btn.planner-only {
+    display: inline-flex;
+}
+
+/* Hide project management actions by default */
+.project-management-actions.planner-only {
+    display: none;
+}
+
+/* Show project management actions only when in planner mode AND hovering over project */
+.planner-mode-on .project-column:hover .project-management-actions.planner-only {
+    display: flex;
 }
 
 .action-btn {
@@ -603,53 +1091,50 @@ body {
     transform: scale(1.05);
 }
 
-/* Drag Handle */
-.drag-handle {
-    margin-right: 10px;
-    color: #ccc;
-    cursor: grab;
-    padding: 2px;
-    transition: color 0.3s ease;
+.set-parent-btn {
+    background: #9C27B0;
+    color: white;
 }
 
-.drag-handle:hover {
-    color: #667eea;
+.set-parent-btn:hover {
+    background: #7B1FA2;
+    transform: scale(1.05);
 }
 
-.drag-handle:active {
-    cursor: grabbing;
+.make-root-btn {
+    background: #FF9800;
+    color: white;
 }
 
-/* Drag & Drop States */
-.todo-item.dragging {
-    opacity: 0.6;
-    transform: rotate(2deg) scale(1.02);
-    box-shadow: 0 15px 30px rgba(0,0,0,0.3);
-    z-index: 1000;
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 8px;
-    transition: all 0.2s ease;
+.make-root-btn:hover:not(:disabled) {
+    background: #F57C00;
+    transform: scale(1.05);
 }
 
-.todo-item.drag-over {
-    background: rgba(102, 126, 234, 0.1);
-    border: 2px dashed #667eea;
-    border-radius: 8px;
-    transform: scale(1.02);
-    animation: pulse 1s infinite;
+.make-root-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    opacity: 0.5;
 }
 
-.todo-item.drag-over-child {
-    background: linear-gradient(135deg, rgba(76, 175, 80, 0.1), rgba(76, 175, 80, 0.05));
-    border: 2px dashed #4CAF50;
-    border-left: 4px solid #4CAF50;
-    border-radius: 8px;
-    transform: scale(1.02);
-    box-shadow: 0 5px 15px rgba(76, 175, 80, 0.2);
+
+/* Parent Selection Effects */
+.parent-selection-available {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.1), rgba(76, 175, 80, 0.05)) !important;
+    border: 1px solid transparent !important;
+    border-radius: 8px !important;
+    cursor: pointer !important;
+    transform: scale(1.02) !important;
+    animation: parentSelectionPulse 2s infinite !important;
 }
 
-.todo-item.drag-over-child::after {
-    content: "Thả vào đây để tạo quan hệ cha-con";
+.parent-selection-available:hover {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.2), rgba(76, 175, 80, 0.1)) !important;
+    transform: scale(1.05) !important;
+}
+
+.parent-selection-available::after {
+    content: "Nhấn để chọn làm cha";
     position: absolute;
     top: 50%;
     right: 10px;
@@ -662,38 +1147,70 @@ body {
     font-weight: 500;
     z-index: 1001;
     opacity: 0.9;
+    white-space: nowrap;
 }
 
-@keyframes pulse {
+.parent-selection-child {
+    background: linear-gradient(135deg, rgba(255, 152, 0, 0.1), rgba(255, 152, 0, 0.05)) !important;
+    border: 1px solid transparent !important;
+    border-radius: 8px !important;
+    opacity: 0.7 !important;
+}
+
+.parent-selection-child::after {
+    content: "Todo đang chọn";
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    background: #FF9800;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    z-index: 1001;
+    opacity: 0.9;
+    white-space: nowrap;
+}
+
+.parent-selection-descendant {
+    background: linear-gradient(135deg, rgba(244, 67, 54, 0.1), rgba(244, 67, 54, 0.05)) !important;
+    border: 1px solid transparent !important;
+    border-radius: 8px !important;
+    opacity: 0.6 !important;
+    cursor: not-allowed !important;
+}
+
+.parent-selection-descendant::after {
+    content: "Không thể chọn con/cháu";
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    background: #F44336;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    z-index: 1001;
+    opacity: 0.9;
+    white-space: nowrap;
+}
+
+@keyframes parentSelectionPulse {
     0% {
-        box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.4);
+        box-shadow: 0 5px 15px rgba(76, 175, 80, 0.2);
     }
-    70% {
-        box-shadow: 0 0 0 10px rgba(102, 126, 234, 0);
+    50% {
+        box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4);
     }
     100% {
-        box-shadow: 0 0 0 0 rgba(102, 126, 234, 0);
+        box-shadow: 0 5px 15px rgba(76, 175, 80, 0.2);
     }
 }
 
-.drop-zone-indicator {
-    position: absolute;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, #667eea, #764ba2);
-    border-radius: 2px;
-    z-index: 999;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
-}
-
-.drop-zone-indicator.top {
-    top: -2px;
-}
-
-.drop-zone-indicator.bottom {
-    bottom: -2px;
-}
 
 .delete-btn {
     background: #ff4757;
@@ -711,6 +1228,7 @@ body {
     padding: 60px 30px;
     color: #999;
     display: none;
+    cursor: pointer;
 }
 
 .empty-state.show {
@@ -761,36 +1279,6 @@ body {
     color: #667eea;
 }
 
-/* Footer */
-.footer {
-    padding: 20px 30px;
-    text-align: center;
-    border-top: 1px solid #e0e0e0;
-}
-
-.clear-btn {
-    background: #ff4757;
-    color: white;
-    border: none;
-    padding: 12px 20px;
-    border-radius: 25px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    font-size: 0.9rem;
-}
-
-.clear-btn:hover {
-    background: #ff3742;
-    transform: translateY(-2px);
-    box-shadow: 0 10px 20px rgba(255, 71, 87, 0.3);
-}
-
-.clear-btn:disabled {
-    background: #ccc;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
-}
 
 /* Responsive Design */
 @media (max-width: 768px) {
@@ -802,19 +1290,58 @@ body {
         font-size: 2rem;
     }
     
-    .input-section,
-    .search-section,
     .filter-section,
-    .progress-section,
-    .todo-list,
-    .footer {
-        padding-left: 20px;
-        padding-right: 20px;
+    .multi-project-container {
+        padding-left: 15px;
+        padding-right: 15px;
+    }
+    
+    .multi-project-container {
+        gap: 15px;
+        padding: 15px;
+    }
+    
+    .project-column {
+        min-width: 280px;
+        max-width: 320px;
     }
     
     .filter-section {
         flex-direction: column;
         align-items: stretch;
+        gap: 10px;
+    }
+    
+    .filter-section .search-container {
+        max-width: none;
+        order: 1;
+    }
+    
+    .filter-section .filter-buttons {
+        order: 2;
+        justify-content: center;
+    }
+    
+    
+    .filter-section .create-project-btn {
+        order: 4;
+        align-self: center;
+    }
+    
+    .filter-section .calendar-btn {
+        order: 5;
+        align-self: center;
+    }
+    
+    .filter-section .planner-mode-toggle {
+        order: 6;
+        align-self: center;
+    }
+    
+    .filter-section .user-avatar-container {
+        order: 7;
+        align-self: center;
+        margin-left: 0;
     }
     
     .filter-buttons {
@@ -827,13 +1354,19 @@ body {
     }
     
     .todo-item:hover {
-        margin: 0 -20px;
-        padding-left: 20px;
-        padding-right: 20px;
+        background: rgba(102, 126, 234, 0.05);
     }
     
     .todo-actions {
         gap: 3px;
+        padding: 3px 6px;
+    }
+    
+    .children-count {
+        margin-right: 8px;
+        font-size: 0.7rem;
+        padding: 3px 6px;
+        min-width: 18px;
     }
     
     .action-btn {
@@ -853,6 +1386,46 @@ body {
 }
 
 @media (max-width: 480px) {
+    .multi-project-container {
+        gap: 10px;
+        padding: 10px;
+    }
+    
+    .project-column {
+        min-width: 250px;
+        max-width: 280px;
+    }
+    
+    .project-header-small {
+        padding: 12px 15px;
+        min-height: 50px;
+    }
+    
+    .project-actions {
+        gap: 4px;
+    }
+    
+    .project-action-btn {
+        width: 24px;
+        height: 24px;
+        font-size: 0.7rem;
+    }
+    
+    .add-todo-btn {
+        width: 28px;
+        height: 28px;
+        font-size: 0.8rem;
+    }
+    
+    .project-title-small {
+        font-size: 1rem;
+    }
+    
+    .project-todo-count-small {
+        font-size: 0.7rem;
+        padding: 3px 6px;
+    }
+    
     .todo-actions {
         flex-wrap: wrap;
         gap: 2px;
@@ -869,9 +1442,10 @@ body {
     }
     
     .children-count {
-        font-size: 0.7rem;
-        padding: 3px 6px;
-        min-width: 18px;
+        font-size: 0.65rem;
+        padding: 2px 5px;
+        min-width: 16px;
+        margin-right: 6px;
     }
 }
 
