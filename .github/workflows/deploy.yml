@@ -6,9 +6,23 @@ on:
   pull_request:
     branches: [ main ]
 
+# Cấp quyền cho GitHub Actions
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Chỉ cho phép một deployment chạy cùng lúc
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     
     steps:
     - name: Checkout
@@ -36,16 +50,14 @@ jobs:
         window.firebaseConfig = firebaseConfig;
         EOF
         
-    - name: Deploy to GitHub Pages
-      uses: peaceiris/actions-gh-pages@v3
-      if: github.ref == 'refs/heads/main'
+    - name: Setup Pages
+      uses: actions/configure-pages@v4
+      
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v3
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./
-        exclude_assets: |
-          .github/
-          firebase-config.js
-          firebase-config.example.js
-          FIREBASE_SETUP.md
-          GITHUB_PAGES_DEPLOY.md
-          README.md
+        path: '.'
+        
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
