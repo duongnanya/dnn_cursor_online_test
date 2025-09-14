@@ -30,16 +30,18 @@ const firebaseConfig = {
 3. Trong sidebar, click **Secrets and variables** → **Actions**
 4. Click **New repository secret**
 
+**Lưu ý**: Tên secrets phải chính xác như bảng dưới đây (không có dấu gạch dưới)
+
 ### Thêm các secrets sau:
 
 | Secret Name | Value | Ví dụ |
 |-------------|-------|-------|
-| `FIREBASE_API_KEY` | API Key từ config | `AIzaSyBY_lzJj03AMY5msPIhHSi6s2jLzJXZ-jw` |
-| `FIREBASE_AUTH_DOMAIN` | Auth Domain | `todo-5mins.firebaseapp.com` |
-| `FIREBASE_PROJECT_ID` | Project ID | `todo-5mins` |
-| `FIREBASE_STORAGE_BUCKET` | Storage Bucket | `todo-5mins.firebasestorage.app` |
-| `FIREBASE_MESSAGING_SENDER_ID` | Messaging Sender ID | `176286753890` |
-| `FIREBASE_APP_ID` | App ID | `1:176286753890:web:d1bd44d184ffa9a597dd3b` |
+| `APIKEY` | API Key từ config | `AIzaSyBY_lzJj03AMY5msPIhHSi6s2jLzJXZ-jw` |
+| `AUTHDOMAIN` | Auth Domain | `todo-5mins.firebaseapp.com` |
+| `PROJECTID` | Project ID | `todo-5mins` |
+| `STORAGEBUCKET` | Storage Bucket | `todo-5mins.firebasestorage.app` |
+| `MESSAGINGSENDERID` | Messaging Sender ID | `176286753890` |
+| `APPID` | App ID | `1:176286753890:web:d1bd44d184ffa9a597dd3b` |
 
 ## Bước 3: Cấu hình Firebase Console
 
