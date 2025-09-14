@@ -30,6 +30,16 @@
     
     <!-- Firebase Configuration -->
     <script src="firebase-config.js" onerror="handleFirebaseConfigError()"></script>
+    <script>
+        // Debug: Log Firebase config sau khi load
+        setTimeout(() => {
+            console.log('=== FIREBASE CONFIG DEBUG ===');
+            console.log('window.firebaseConfig:', window.firebaseConfig);
+            console.log('API Key:', window.firebaseConfig?.apiKey);
+            console.log('isDemoMode:', window.isDemoMode);
+            console.log('=============================');
+        }, 1000);
+    </script>
     
     <!-- Firebase SDK -->
     <script type="module">
