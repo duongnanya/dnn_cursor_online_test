@@ -1511,6 +1511,7 @@ class TodoApp {
                     this.showMessage('Chế độ demo: Tính năng Firebase đã tắt. Dữ liệu chỉ lưu local.', 'warning');
                     this.isDemoMode = true;
                 } else {
+                    console.log('Firebase initialized successfully, setting up auth listeners');
                     this.setupAuthListeners();
                 }
             } else {
@@ -1550,9 +1551,21 @@ class TodoApp {
     }
 
     async signInWithGoogle() {
+        console.log('signInWithGoogle called');
+        console.log('isDemoMode:', this.isDemoMode);
+        console.log('firebaseAuth:', this.firebaseAuth);
+        console.log('googleProvider:', this.googleProvider);
+        
         // Kiểm tra demo mode
         if (this.isDemoMode) {
             this.showMessage('Chế độ demo: Không thể đăng nhập Firebase. Dữ liệu chỉ lưu local.', 'warning');
+            return;
+        }
+        
+        // Kiểm tra Firebase auth
+        if (!this.firebaseAuth || !this.googleProvider) {
+            console.error('Firebase auth or provider not initialized');
+            this.showMessage('Firebase chưa được khởi tạo. Vui lòng tải lại trang.', 'error');
             return;
         }
         
@@ -1565,7 +1578,7 @@ class TodoApp {
             console.log('Đăng nhập thành công:', this.user.displayName);
         } catch (error) {
             console.error('Lỗi đăng nhập:', error);
-            alert('Có lỗi xảy ra khi đăng nhập. Vui lòng thử lại.');
+            this.showMessage('Có lỗi xảy ra khi đăng nhập: ' + error.message, 'error');
         }
     }
 

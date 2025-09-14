@@ -34,27 +34,31 @@
             window.isDemoMode = true;
         };
         
-        // Đợi một chút để đảm bảo firebase-config.js được load
-        setTimeout(() => {
+        // Function khởi tạo Firebase
+        function initializeFirebase() {
             if (!window.firebaseConfig) {
-                console.log('Firebase config not found after timeout, using demo mode');
+                console.log('Firebase config not found, using demo mode');
                 window.handleFirebaseConfigError();
-            } else {
-                console.log('Firebase config loaded successfully:', window.firebaseConfig);
-                window.isDemoMode = false;
+                return;
             }
-        }, 100);
+            
+            console.log('Firebase config loaded successfully:', window.firebaseConfig);
+            window.isDemoMode = false;
+            
+            // Khởi tạo Firebase
+            const app = initializeApp(window.firebaseConfig);
+            const auth = getAuth(app);
+            const db = getFirestore(app);
+            const googleProvider = new GoogleAuthProvider();
+            
+            // Export để sử dụng trong script.js
+            window.firebaseAuth = auth;
+            window.firebaseDB = db;
+            window.googleProvider = googleProvider;
+        }
         
-        // Khởi tạo Firebase
-        const app = initializeApp(window.firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const googleProvider = new GoogleAuthProvider();
-        
-        // Export để sử dụng trong script.js
-        window.firebaseAuth = auth;
-        window.firebaseDB = db;
-        window.googleProvider = googleProvider;
+        // Đợi một chút để đảm bảo firebase-config.js được load
+        setTimeout(initializeFirebase, 100);
     </script>
 </head>
 <body>
