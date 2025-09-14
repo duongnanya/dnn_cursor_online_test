@@ -21,7 +21,6 @@ class TodoApp {
         this.firebaseAuth = null;
         this.firebaseDB = null;
         this.googleProvider = null;
-        this.isDemoMode = false;
         
         this.init();
     }
@@ -1584,15 +1583,8 @@ class TodoApp {
                 this.firebaseDB = window.firebaseDB;
                 this.googleProvider = window.googleProvider;
                 
-                // Kiểm tra demo mode
-                if (window.isDemoMode) {
-                    console.warn('Running in demo mode - Firebase features disabled');
-                    this.showMessage('Chế độ demo: Tính năng Firebase đã tắt. Dữ liệu chỉ lưu local.', 'warning');
-                    this.isDemoMode = true;
-                } else {
-                    console.log('Firebase initialized successfully, setting up auth listeners');
-                    this.setupAuthListeners();
-                }
+                console.log('Firebase initialized successfully, setting up auth listeners');
+                this.setupAuthListeners();
             } else if (attempts < maxAttempts) {
                 setTimeout(checkFirebase, 100);
             } else {
@@ -1634,15 +1626,8 @@ class TodoApp {
 
     async signInWithGoogle() {
         console.log('signInWithGoogle called');
-        console.log('isDemoMode:', this.isDemoMode);
         console.log('firebaseAuth:', this.firebaseAuth);
         console.log('googleProvider:', this.googleProvider);
-        
-        // Kiểm tra demo mode
-        if (this.isDemoMode) {
-            this.showMessage('Chế độ demo: Không thể đăng nhập Firebase. Dữ liệu chỉ lưu local.', 'warning');
-            return;
-        }
         
         // Kiểm tra Firebase auth
         if (!this.firebaseAuth || !this.googleProvider) {
@@ -1721,7 +1706,7 @@ class TodoApp {
     }
 
     async loadUserData() {
-        if (!this.isAuthenticated || !this.user || this.isDemoMode) return;
+        if (!this.isAuthenticated || !this.user) return;
         
         // Hiển thị loading message
         this.showLoadingMessage('Đang tải dữ liệu từ Firebase...');
@@ -1761,7 +1746,7 @@ class TodoApp {
     }
 
     async saveUserData() {
-        if (!this.isAuthenticated || !this.user || this.isDemoMode) return;
+        if (!this.isAuthenticated || !this.user) return;
         
         try {
             // Import Firestore functions

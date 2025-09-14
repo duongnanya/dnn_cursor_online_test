@@ -7,39 +7,8 @@
     <link rel="stylesheet" href="style.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     
-    <!-- Define error handler first -->
-    <script>
-        // Function xử lý lỗi khi không load được config
-        window.handleFirebaseConfigError = function() {
-            console.warn('Firebase config file not found. Using demo config.');
-            
-            // Demo config (fallback)
-            window.firebaseConfig = {
-                apiKey: "demo-api-key",
-                authDomain: "demo-project.firebaseapp.com",
-                projectId: "demo-project",
-                storageBucket: "demo-project.appspot.com",
-                messagingSenderId: "123456789",
-                appId: "1:123456789:web:demo"
-            };
-            
-            // Đánh dấu là demo mode
-            window.isDemoMode = true;
-        };
-    </script>
-    
     <!-- Firebase Configuration -->
-    <script src="firebase-config.js" onerror="handleFirebaseConfigError()"></script>
-    <script>
-        // Debug: Log Firebase config sau khi load
-        setTimeout(() => {
-            console.log('=== FIREBASE CONFIG DEBUG ===');
-            console.log('window.firebaseConfig:', window.firebaseConfig);
-            console.log('API Key:', window.firebaseConfig?.apiKey);
-            console.log('isDemoMode:', window.isDemoMode);
-            console.log('=============================');
-        }, 1000);
-    </script>
+    <script src="firebase-config.js"></script>
     
     <!-- Firebase SDK -->
     <script type="module">
@@ -47,16 +16,14 @@
         import { getAuth, GoogleAuthProvider } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
         import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
         
-        // Function khởi tạo Firebase
+        // Khởi tạo Firebase
         function initializeFirebase() {
             if (!window.firebaseConfig) {
-                console.log('Firebase config not found, using demo mode');
-                window.handleFirebaseConfigError();
+                console.error('Firebase config not found! Please ensure firebase-config.js is loaded.');
                 return;
             }
             
             console.log('Firebase config loaded successfully:', window.firebaseConfig);
-            window.isDemoMode = false;
             
             // Khởi tạo Firebase
             const app = initializeApp(window.firebaseConfig);
@@ -76,8 +43,8 @@
             });
         }
         
-        // Đợi lâu hơn để đảm bảo firebase-config.js được load (đặc biệt trên GitHub Pages)
-        setTimeout(initializeFirebase, 500);
+        // Khởi tạo Firebase sau khi config được load
+        setTimeout(initializeFirebase, 100);
     </script>
 </head>
 <body>
