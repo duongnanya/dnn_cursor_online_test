@@ -55,10 +55,16 @@
             window.firebaseAuth = auth;
             window.firebaseDB = db;
             window.googleProvider = googleProvider;
+            
+            console.log('Firebase services initialized:', {
+                auth: !!auth,
+                db: !!db,
+                provider: !!googleProvider
+            });
         }
         
-        // Đợi một chút để đảm bảo firebase-config.js được load
-        setTimeout(initializeFirebase, 100);
+        // Đợi lâu hơn để đảm bảo firebase-config.js được load (đặc biệt trên GitHub Pages)
+        setTimeout(initializeFirebase, 500);
     </script>
 </head>
 <body>

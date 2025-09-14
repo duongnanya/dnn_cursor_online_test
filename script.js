@@ -1499,7 +1499,13 @@ class TodoApp {
     // Firebase Methods
     initFirebase() {
         // Đợi Firebase được load
+        let attempts = 0;
+        const maxAttempts = 50; // 5 giây timeout
+        
         const checkFirebase = () => {
+            attempts++;
+            console.log(`Checking Firebase initialization (attempt ${attempts}/${maxAttempts})`);
+            
             if (window.firebaseAuth && window.firebaseDB && window.googleProvider) {
                 this.firebaseAuth = window.firebaseAuth;
                 this.firebaseDB = window.firebaseDB;
@@ -1514,8 +1520,11 @@ class TodoApp {
                     console.log('Firebase initialized successfully, setting up auth listeners');
                     this.setupAuthListeners();
                 }
-            } else {
+            } else if (attempts < maxAttempts) {
                 setTimeout(checkFirebase, 100);
+            } else {
+                console.error('Firebase initialization timeout after 5 seconds');
+                this.showMessage('Firebase khởi tạo quá lâu. Vui lòng tải lại trang.', 'error');
             }
         };
         checkFirebase();
