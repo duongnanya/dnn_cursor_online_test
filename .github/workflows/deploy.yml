@@ -89,6 +89,7 @@ jobs:
       uses: actions/upload-pages-artifact@v3
       with:
         path: '.'
+        # Đảm bảo firebase-config.js được include trong artifact
         
     - name: Deploy to GitHub Pages
       id: deployment
