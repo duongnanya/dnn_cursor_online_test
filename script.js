@@ -168,7 +168,8 @@ class TodoApp {
             level: 0,
             order: siblings.length,
             projectId: projectId,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            timeBlocks: 1 // Default 1 block (5 phút)
         };
         
         this.todos.unshift(newTodo);
@@ -186,6 +187,8 @@ class TodoApp {
             // Lưu thời gian xong khi đánh dấu xong
             if (todo.completed) {
                 todo.completedAt = new Date().toISOString();
+                // Khi click trực tiếp checkbox, luôn reset về 1 block
+                todo.timeBlocks = 1;
             } else {
                 // Xóa thời gian xong khi bỏ đánh dấu
                 delete todo.completedAt;
@@ -196,6 +199,21 @@ class TodoApp {
             this.updateStats();
             
             const message = todo.completed ? 'Đã xong!' : 'Đã bỏ đánh dấu xong!';
+            this.showMessage(message, 'success');
+        }
+    }
+
+    setTimeBlocks(id, blocks) {
+        const todo = this.todos.find(t => t.id === id);
+        if (todo) {
+            todo.timeBlocks = blocks;
+            todo.completed = true; // Tự động đánh dấu hoàn thành khi set time blocks
+            todo.completedAt = new Date().toISOString();
+            this.saveTodos();
+            this.updateTodoItem(id);
+            this.updateStats();
+            
+            const message = `Đã hoàn thành trong ${blocks} block thời gian!`;
             this.showMessage(message, 'success');
         }
     }
@@ -237,6 +255,13 @@ class TodoApp {
         return this.todos.some(todo => todo.parentId === parentId);
     }
 
+    isLeafNode(todoId) {
+        // Kiểm tra xem todo có phải là node lá (có parent nhưng không có con)
+        const todo = this.todos.find(t => t.id === todoId);
+        if (!todo || !todo.parentId) return false; // Không phải con hoặc không tồn tại
+        return !this.hasChildren(todoId); // Có parent nhưng không có con
+    }
+
     addSubTodo(parentId) {
         const parentTodo = this.todos.find(t => t.id === parentId);
         if (!parentTodo) return;
@@ -261,7 +286,8 @@ class TodoApp {
                 parentId: parentId,
                 level: parentLevel + 1,
                 order: order,
-                projectId: parentTodo.projectId
+                projectId: parentTodo.projectId,
+                timeBlocks: 1 // Default 1 block (5 phút)
             };
 
             this.todos.unshift(todo);
@@ -426,7 +452,7 @@ class TodoApp {
         } else {
             this.collapsedTodos.add(todoId);
         }
-        this.updateTodoItem(todoId); // Chỉ update todo item cụ thể
+        this.render(); // Render lại toàn bộ danh sách để ẩn/hiện children
     }
 
     // Check if todo is collapsed
@@ -1066,14 +1092,16 @@ class TodoApp {
                 <div class="todo-item ${todo.level > 0 ? `level-${todo.level}` : ''} ${parentSelectionClass}" data-id="${todo.id}" 
                      ${this.parentSelectionMode && canBeParent ? `onclick="todoApp.selectParent('${todo.id}')"` : ''}>
                     <div class="todo-content">
-                        <div class="todo-checkbox ${todo.completed ? 'completed' : ''}" 
-                             onclick="todoApp.toggleTodo('${todo.id}')">
-                            ${todo.completed ? '<i class="fas fa-check"></i>' : ''}
+                        <div class="todo-checkbox ${todo.completed ? 'completed' : ''} ${this.isLeafNode(todo.id) ? 'leaf-node' : ''}" 
+                             onclick="todoApp.toggleTodo('${todo.id}')"
+                             ${this.isLeafNode(todo.id) ? 'onmouseenter="todoApp.showTimeBlocksDropdown(event, \'' + todo.id + '\')" onmouseleave="todoApp.hideTimeBlocksDropdown()"' : ''}>
+                            ${todo.completed ? (todo.timeBlocks > 1 ? todo.timeBlocks : '<i class="fas fa-check"></i>') : ''}
+                            ${this.isLeafNode(todo.id) && !todo.completed ? '<div class="time-blocks-dropdown" style="display: none;" onmouseenter="todoApp.cancelHideDropdown()" onmouseleave="todoApp.hideTimeBlocksDropdown()"><span onclick="event.stopPropagation(); todoApp.setTimeBlocks(\'' + todo.id + '\', 2)">2</span><span onclick="event.stopPropagation(); todoApp.setTimeBlocks(\'' + todo.id + '\', 3)">3</span><span onclick="event.stopPropagation(); todoApp.setTimeBlocks(\'' + todo.id + '\', 4)">4</span><span onclick="event.stopPropagation(); todoApp.setTimeBlocks(\'' + todo.id + '\', 5)">5</span><span onclick="event.stopPropagation(); todoApp.setTimeBlocks(\'' + todo.id + '\', 6)">6</span></div>' : ''}
                         </div>
                         <div class="todo-text ${todo.completed ? 'completed' : ''}" 
                              ondblclick="todoApp.editTodo('${todo.id}')">
                             <span class="todo-text-content">${this.highlightSearchTerm(todo.text)}</span>
-                            ${this.hasChildren(todo.id) && todo.projectId === project.id ? `
+                            ${this.hasChildren(todo.id) ? `
                                 <span class="children-count ${this.isCollapsed(todo.id) ? 'collapsed' : 'expanded'}" 
                                       onclick="todoApp.toggleCollapse('${todo.id}')" 
                                       title="${this.isCollapsed(todo.id) ? 'Nhấn để mở rộng' : 'Nhấn để thu gọn'}">
@@ -1280,14 +1308,16 @@ class TodoApp {
         <div class="todo-item ${todo.level > 0 ? `level-${todo.level}` : ''} ${parentSelectionClass}" data-id="${todo.id}" 
              ${this.parentSelectionMode && canBeParent ? `onclick="todoApp.selectParent('${todo.id}')"` : ''}>
             <div class="todo-content">
-                <div class="todo-checkbox ${todo.completed ? 'completed' : ''}" 
-                     onclick="todoApp.toggleTodo('${todo.id}')">
-                    ${todo.completed ? '<i class="fas fa-check"></i>' : ''}
+                <div class="todo-checkbox ${todo.completed ? 'completed' : ''} ${this.isLeafNode(todo.id) ? 'leaf-node' : ''}" 
+                     onclick="todoApp.toggleTodo('${todo.id}')"
+                     ${this.isLeafNode(todo.id) ? 'onmouseenter="todoApp.showTimeBlocksDropdown(event, \'' + todo.id + '\')" onmouseleave="todoApp.hideTimeBlocksDropdown()"' : ''}>
+                    ${todo.completed ? (todo.timeBlocks > 1 ? todo.timeBlocks : '<i class="fas fa-check"></i>') : ''}
+                    ${this.isLeafNode(todo.id) && !todo.completed ? '<div class="time-blocks-dropdown" style="display: none;" onmouseenter="todoApp.cancelHideDropdown()" onmouseleave="todoApp.hideTimeBlocksDropdown()"><span onclick="event.stopPropagation(); todoApp.setTimeBlocks(\'' + todo.id + '\', 2)">2</span><span onclick="event.stopPropagation(); todoApp.setTimeBlocks(\'' + todo.id + '\', 3)">3</span><span onclick="event.stopPropagation(); todoApp.setTimeBlocks(\'' + todo.id + '\', 4)">4</span><span onclick="event.stopPropagation(); todoApp.setTimeBlocks(\'' + todo.id + '\', 5)">5</span><span onclick="event.stopPropagation(); todoApp.setTimeBlocks(\'' + todo.id + '\', 6)">6</span></div>' : ''}
                 </div>
                 <div class="todo-text ${todo.completed ? 'completed' : ''}" 
                      ondblclick="todoApp.editTodo('${todo.id}')">
                     <span class="todo-text-content">${this.highlightSearchTerm(todo.text)}</span>
-                    ${this.hasChildren(todo.id) && todo.projectId === project.id ? `
+                    ${this.hasChildren(todo.id) ? `
                         <span class="children-count ${this.isCollapsed(todo.id) ? 'collapsed' : 'expanded'}" 
                               onclick="todoApp.toggleCollapse('${todo.id}')" 
                               title="${this.isCollapsed(todo.id) ? 'Nhấn để mở rộng' : 'Nhấn để thu gọn'}">
@@ -1321,6 +1351,42 @@ class TodoApp {
             </div>
         </div>
         `;
+    }
+
+    showTimeBlocksDropdown(event, todoId) {
+        // Chỉ hiện dropdown cho leaf nodes chưa hoàn thành
+        const todo = this.todos.find(t => t.id === todoId);
+        if (!todo || todo.completed || !this.isLeafNode(todoId)) return;
+        
+        event.stopPropagation();
+        
+        // Clear any existing hide timeout
+        if (this.hideDropdownTimeout) {
+            clearTimeout(this.hideDropdownTimeout);
+            this.hideDropdownTimeout = null;
+        }
+        
+        const dropdown = event.target.querySelector('.time-blocks-dropdown');
+        if (dropdown) {
+            dropdown.style.display = 'flex';
+        }
+    }
+
+    hideTimeBlocksDropdown() {
+        // Delay ẩn dropdown để dễ di chuột
+        this.hideDropdownTimeout = setTimeout(() => {
+            document.querySelectorAll('.time-blocks-dropdown').forEach(dropdown => {
+                dropdown.style.display = 'none';
+            });
+        }, 150); // 150ms delay
+    }
+
+    cancelHideDropdown() {
+        // Hủy việc ẩn dropdown khi hover vào dropdown
+        if (this.hideDropdownTimeout) {
+            clearTimeout(this.hideDropdownTimeout);
+            this.hideDropdownTimeout = null;
+        }
     }
 
     togglePlannerModeFromDoubleClick() {
@@ -1470,15 +1536,22 @@ class TodoApp {
             const todos = saved ? JSON.parse(saved) : [];
             
             // Migrate existing todos to default project if they don't have projectId
+            // and add timeBlocks field if missing
             const migratedTodos = todos.map(todo => {
                 if (!todo.projectId) {
                     todo.projectId = 'default';
+                }
+                if (!todo.timeBlocks) {
+                    todo.timeBlocks = 1; // Default 1 block
                 }
                 return todo;
             });
             
             // Save migrated todos if there were changes
-            if (migratedTodos.some(todo => !todos.find(t => t.id === todo.id)?.projectId)) {
+            if (migratedTodos.some(todo => {
+                const original = todos.find(t => t.id === todo.id);
+                return !original?.projectId || !original?.timeBlocks;
+            })) {
                 this.todos = migratedTodos;
                 this.saveTodos();
             }
