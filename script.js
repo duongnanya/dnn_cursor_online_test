@@ -4,16 +4,16 @@ class TodoApp {
         this.projects = this.loadProjects();
         this.currentProjectId = this.loadCurrentProject();
         this.todos = this.loadTodos();
-        this.currentFilter = 'all';
+        this.currentFilter = 'pending'; // Mặc định hiển thị "Còn"
         this.searchQuery = '';
         this.draggedTodo = null;
         this.dropTarget = null;
         this.selectedTodos = new Set();
         this.parentSelectionMode = false;
         this.selectedChildId = null;
+        this.prioritySelectionMode = false;
+        this.selectedPriorityTodoId = null;
         this.collapsedTodos = new Set();
-        this.plannerMode = false;
-        this.savedCollapsedState = new Set(); // Lưu trạng thái collapse trước khi bật planner mode
         
         // Firebase properties
         this.user = null;
@@ -36,8 +36,23 @@ class TodoApp {
         const googleLoginBtn = document.getElementById('googleLoginBtn');
         const logoutBtn = document.getElementById('logoutBtn');
         const syncBtn = document.getElementById('syncBtn');
+        const createProjectBtn = document.getElementById('createProjectBtn');
         const userAvatar = document.getElementById('userAvatar');
         const userMenu = document.getElementById('userMenu');
+        
+        // Context menu event
+        document.addEventListener('contextmenu', (e) => {
+            this.handleContextMenu(e);
+        });
+        
+        // Click outside to close context menu
+        document.addEventListener('click', (e) => {
+            // Không đóng context menu nếu click vào chính nó
+            if (!e.target.closest('.custom-context-menu')) {
+                this.closeContextMenu();
+            }
+        });
+
         
         if (googleLoginBtn) {
             googleLoginBtn.addEventListener('click', () => {
@@ -57,6 +72,12 @@ class TodoApp {
             });
         }
         
+        if (createProjectBtn) {
+            createProjectBtn.addEventListener('click', () => {
+                this.createProject();
+            });
+        }
+        
         if (userAvatar) {
             userAvatar.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -69,6 +90,15 @@ class TodoApp {
             if (!e.target.closest('.user-avatar-container')) {
                 this.closeUserMenu();
             }
+            
+            // Cancel selection modes when clicking outside
+            if (this.parentSelectionMode && !e.target.closest('.todo-item')) {
+                this.cancelParentSelection();
+            }
+            
+            if (this.prioritySelectionMode && !e.target.closest('.todo-item')) {
+                this.cancelPrioritySelection();
+            }
         });
 
         // Filter buttons
@@ -80,12 +110,6 @@ class TodoApp {
         });
 
 
-        // Planner mode toggle
-        const plannerModeCheckbox = document.getElementById('plannerMode');
-        plannerModeCheckbox.addEventListener('change', (e) => {
-            this.plannerMode = e.target.checked;
-            this.togglePlannerMode();
-        });
 
         // Search functionality
         const searchInput = document.getElementById('searchInput');
@@ -104,13 +128,10 @@ class TodoApp {
             this.handleKeyboardShortcuts(e);
         });
 
-        // Close actions when clicking outside
+        // Close parent selection mode when clicking outside
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.todo-item')) {
-                document.querySelectorAll('.todo-actions.show').forEach(action => {
-                    action.classList.remove('show');
-                });
-                // Also cancel parent selection mode
+                // Cancel parent selection mode
                 if (this.parentSelectionMode) {
                     this.cancelParentSelection();
                 }
@@ -119,14 +140,6 @@ class TodoApp {
 
         // Double-click on multi-project-container to toggle planner mode
         const multiProjectContainer = document.getElementById('multiProjectContainer');
-        if (multiProjectContainer) {
-            multiProjectContainer.addEventListener('dblclick', (e) => {
-                // Only toggle if clicking on the container itself, not on project cards
-                if (e.target === multiProjectContainer || e.target.closest('.empty-state')) {
-                    this.togglePlannerModeFromDoubleClick();
-                }
-            });
-        }
     }
 
     addTodo(parentId = null) {
@@ -160,7 +173,7 @@ class TodoApp {
         );
         
         const newTodo = {
-            id: Date.now().toString(),
+            id: this.generateId(),
             text: trimmedText,
             completed: false,
             parentId: null,
@@ -168,7 +181,8 @@ class TodoApp {
             order: siblings.length,
             projectId: projectId,
             createdAt: new Date().toISOString(),
-            timeBlocks: 1 // Default 1 block (5 phút)
+            timeBlocks: 1, // Default 1 block (5 phút)
+            skipped: false // Default not skipped
         };
         
         this.todos.unshift(newTodo);
@@ -179,6 +193,7 @@ class TodoApp {
     }
 
     toggleTodo(id) {
+        console.log('toggleTodo called with id:', id);
         const todo = this.todos.find(t => t.id === id);
         if (todo) {
             todo.completed = !todo.completed;
@@ -199,6 +214,8 @@ class TodoApp {
             
             const message = todo.completed ? 'Đã xong!' : 'Đã bỏ đánh dấu xong!';
             this.showMessage(message, 'success');
+        } else {
+            console.error('Todo not found with id:', id);
         }
     }
 
@@ -230,6 +247,39 @@ class TodoApp {
         }
     }
 
+    skipTodo(todoId) {
+        const todo = this.todos.find(t => t.id === todoId);
+        if (!todo) return;
+
+        // Skip todo ngay lập tức
+        const childrenIds = this.getAllChildren(todoId);
+        const childrenCount = childrenIds.length;
+        this.performSkip(todoId, childrenIds, childrenCount);
+    }
+
+
+    performSkip(todoId, childrenIds, childrenCount) {
+        // Skip todo và tất cả children
+        const allIds = [todoId, ...childrenIds];
+        
+        allIds.forEach(id => {
+            const todo = this.todos.find(t => t.id === id);
+            if (todo) {
+                todo.skipped = true;
+                todo.skippedAt = new Date().toISOString();
+            }
+        });
+
+        this.saveTodos();
+        this.render();
+        
+        const message = childrenCount > 0 
+            ? `Đã skip todo và ${childrenCount} công việc con!`
+            : 'Đã skip todo!';
+        this.showMessage(message, 'success');
+    }
+
+
     getAllChildren(parentId) {
         const children = [];
         const findChildren = (id) => {
@@ -245,13 +295,19 @@ class TodoApp {
     }
 
     getChildrenCount(parentId) {
-        // Đếm tất cả children trực tiếp và gián tiếp
+        // Đếm tất cả children để giữ nguyên thống kê bất kể filter
         return this.getAllChildren(parentId).length;
     }
 
     hasChildren(parentId) {
         // Kiểm tra xem todo có children trực tiếp không
         return this.todos.some(todo => todo.parentId === parentId);
+    }
+
+    hasIncompleteChildren(parentId) {
+        // Kiểm tra xem todo có children chưa hoàn thành không (không tính skip)
+        const children = this.todos.filter(todo => todo.parentId === parentId);
+        return children.some(child => !child.completed && !child.skipped);
     }
 
     isLeafNode(todoId) {
@@ -278,7 +334,7 @@ class TodoApp {
             const order = siblings.length;
             
             const todo = {
-                id: Date.now().toString(),
+                id: this.generateId(),
                 text: text.trim(),
                 completed: false,
                 createdAt: new Date().toISOString(),
@@ -286,7 +342,8 @@ class TodoApp {
                 level: parentLevel + 1,
                 order: order,
                 projectId: parentTodo.projectId,
-                timeBlocks: 1 // Default 1 block (5 phút)
+                timeBlocks: 1, // Default 1 block (5 phút)
+                skipped: false // Default not skipped
             };
 
             this.todos.unshift(todo);
@@ -325,11 +382,28 @@ class TodoApp {
         this.showMessage('Chọn todo cha cho todo này', 'info');
     }
 
+    // Start priority selection mode
+    startPrioritySelection(todoId) {
+        this.selectedPriorityTodoId = todoId;
+        this.prioritySelectionMode = true;
+        document.body.classList.add('priority-selection-mode');
+        this.render();
+        this.showMessage('Chọn todo anh em để đưa todo hiện tại lên trên', 'info');
+    }
+
     // Cancel parent selection mode
     cancelParentSelection() {
         this.parentSelectionMode = false;
         this.selectedChildId = null;
         document.body.classList.remove('parent-selection-mode');
+        this.render();
+    }
+
+    // Cancel priority selection mode
+    cancelPrioritySelection() {
+        this.prioritySelectionMode = false;
+        this.selectedPriorityTodoId = null;
+        document.body.classList.remove('priority-selection-mode');
         this.render();
     }
 
@@ -357,6 +431,87 @@ class TodoApp {
         this.saveTodos();
         this.render();
         this.showMessage('Đã tạo quan hệ cha-con thành công!', 'success');
+    }
+
+    // Select priority position
+    selectPriority(targetTodoId) {
+        if (!this.prioritySelectionMode || !this.selectedPriorityTodoId) return;
+        
+        const selectedTodo = this.todos.find(t => t.id === this.selectedPriorityTodoId);
+        const targetTodo = this.todos.find(t => t.id === targetTodoId);
+        
+        if (!selectedTodo || !targetTodo) return;
+        
+        console.log('Priority selection:', {
+            selected: selectedTodo.text,
+            target: targetTodo.text,
+            selectedOrder: selectedTodo.order,
+            targetOrder: targetTodo.order
+        });
+        
+        // Kiểm tra xem 2 todo có cùng parent không (anh em)
+        if (selectedTodo.parentId !== targetTodo.parentId) {
+            this.showMessage('Chỉ có thể sắp xếp với todo anh em (cùng cha)!', 'warning');
+            return;
+        }
+        
+        // Lấy order của target todo
+        const targetOrder = targetTodo.order;
+        
+        // Cập nhật order của selected todo để đưa lên trên target
+        selectedTodo.order = targetOrder - 0.5;
+        
+        console.log('After order update:', {
+            selectedNewOrder: selectedTodo.order
+        });
+        
+        // Chuẩn hóa lại order cho tất cả siblings
+        this.normalizeOrderForSiblings(selectedTodo.parentId, selectedTodo.projectId);
+        
+        console.log('After normalize:', {
+            siblings: this.todos
+                .filter(t => t.parentId === selectedTodo.parentId && t.projectId === selectedTodo.projectId)
+                .map(t => ({ text: t.text, order: t.order }))
+                .sort((a, b) => a.order - b.order)
+        });
+        
+        this.saveTodos();
+        this.cancelPrioritySelection();
+        this.render();
+        this.showMessage('Đã sắp xếp thứ tự ưu tiên!', 'success');
+    }
+
+    // Normalize order for siblings to ensure integer sequence
+    normalizeOrderForSiblings(parentId, projectId) {
+        const siblings = this.todos
+            .filter(t => t.parentId === parentId && t.projectId === projectId)
+            .sort((a, b) => a.order - b.order);
+        
+        siblings.forEach((todo, index) => {
+            todo.order = index;
+        });
+    }
+
+    // Assign proper order to all todos based on their creation time
+    assignOrderToAllTodos(todos) {
+        // Group by parentId and projectId
+        const groups = new Map();
+        
+        todos.forEach(todo => {
+            const key = `${todo.parentId || 'root'}-${todo.projectId}`;
+            if (!groups.has(key)) {
+                groups.set(key, []);
+            }
+            groups.get(key).push(todo);
+        });
+        
+        // Sort each group by createdAt and assign order
+        groups.forEach(siblings => {
+            siblings.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+            siblings.forEach((todo, index) => {
+                todo.order = index;
+            });
+        });
     }
 
     // Check if childId is descendant of parentId
@@ -459,6 +614,138 @@ class TodoApp {
         return this.collapsedTodos.has(todoId);
     }
 
+    // Duplicate todo and all its children
+    duplicateTodo(todoId) {
+        const originalTodo = this.todos.find(t => t.id === todoId);
+        if (!originalTodo) return;
+
+        // Tạo mapping để theo dõi ID cũ và mới
+        const idMapping = new Map();
+        
+        // Tạo todo gốc được copy, giữ nguyên parent nếu có
+        const duplicatedTodo = this.createDuplicatedTodo(originalTodo, originalTodo.parentId, true);
+        idMapping.set(todoId, duplicatedTodo.id);
+        
+        // Copy tất cả children theo đúng phân cấp
+        this.duplicateChildren(todoId, duplicatedTodo.id, idMapping);
+        
+        this.saveTodos();
+        this.render();
+        this.showMessage(`Đã nhân bản "${originalTodo.text}" và ${this.getChildrenCount(todoId)} công việc con!`, 'success');
+    }
+
+    // Tạo todo được copy với suffix "copied" (chỉ cho todo gốc)
+    createDuplicatedTodo(originalTodo, newParentId, isRoot = false) {
+        const newTodo = {
+            id: this.generateId(),
+            text: isRoot ? originalTodo.text + ' copied' : originalTodo.text,
+            completed: false,
+            createdAt: new Date().toISOString(),
+            completedAt: null,
+            parentId: newParentId,
+            projectId: originalTodo.projectId,
+            level: newParentId ? (this.todos.find(t => t.id === newParentId)?.level || 0) + 1 : 0,
+            order: this.getNextOrder(originalTodo.projectId, newParentId),
+            timeBlocks: originalTodo.timeBlocks || 1,
+            skipped: false // Default not skipped
+        };
+        
+        this.todos.push(newTodo);
+        return newTodo;
+    }
+
+    // Copy tất cả children theo đúng phân cấp
+    duplicateChildren(originalParentId, newParentId, idMapping) {
+        const children = this.todos.filter(t => t.parentId === originalParentId);
+        
+        children.forEach(child => {
+            // Tạo child mới (không phải root nên không có suffix "copied")
+            const newChild = this.createDuplicatedTodo(child, newParentId, false);
+            idMapping.set(child.id, newChild.id);
+            
+            // Đệ quy copy children của child này
+            this.duplicateChildren(child.id, newChild.id, idMapping);
+        });
+    }
+
+    // Lấy order tiếp theo cho todo mới
+    getNextOrder(projectId, parentId) {
+        const siblings = this.todos.filter(t => t.projectId === projectId && t.parentId === parentId);
+        return siblings.length;
+    }
+
+    // Tạo ID mới cho todo
+    generateId() {
+        return Date.now().toString() + Math.random().toString(36).substr(2, 9);
+    }
+
+    // Kiểm tra tất cả children và grandchildren đã hoàn thành
+    areAllChildrenCompleted(todoId) {
+        const children = this.todos.filter(t => t.parentId === todoId);
+        if (children.length === 0) return true; // Không có children thì coi như completed
+        
+        // Kiểm tra tất cả children đã completed (không tính skip)
+        const nonSkippedChildren = children.filter(child => !child.skipped);
+        if (nonSkippedChildren.length === 0) return true; // Chỉ có skip children
+        
+        const allChildrenCompleted = nonSkippedChildren.every(child => {
+            if (!child.completed) return false;
+            // Đệ quy kiểm tra grandchildren
+            return this.areAllChildrenCompleted(child.id);
+        });
+        
+        return allChildrenCompleted;
+    }
+
+    // Tính tỷ lệ hoàn thành của children (trả về {completed: số, total: số})
+    getChildrenCompletionRatio(todoId) {
+        // Tính ratio cho tất cả children (không phụ thuộc filter) để giữ thống kê
+        const children = this.todos.filter(t => t.parentId === todoId);
+        const nonSkippedChildren = children.filter(t => !t.skipped); // Không tính skip
+        
+        if (nonSkippedChildren.length === 0) return { completed: 0, total: 0 };
+        
+        let completed = 0;
+        let total = nonSkippedChildren.length;
+        
+        nonSkippedChildren.forEach(child => {
+            if (child.completed) {
+                completed++;
+            }
+            // Đệ quy tính grandchildren
+            const grandchildRatio = this.getChildrenCompletionRatio(child.id);
+            completed += grandchildRatio.completed;
+            total += grandchildRatio.total;
+        });
+        
+        return { completed, total };
+    }
+
+    // Tạo nội dung hiển thị cho children-count
+    getChildrenCountDisplay(todoId) {
+        const ratio = this.getChildrenCompletionRatio(todoId);
+        const total = ratio.total;
+        const completed = ratio.completed;
+        
+        // Nếu không có children hoặc tất cả đã hoàn thành hoặc chưa có cái nào hoàn thành
+        if (total === 0 || completed === 0 || completed === total) {
+            return this.getChildrenCount(todoId);
+        }
+        
+        // Nếu có một phần hoàn thành, hiển thị tỷ lệ
+        return `${completed}/${total}`;
+    }
+
+    // Kiểm tra có nên hiển thị tỷ lệ hoàn thành không
+    shouldShowCompletionRatio(todoId) {
+        const ratio = this.getChildrenCompletionRatio(todoId);
+        const total = ratio.total;
+        const completed = ratio.completed;
+        
+        // Hiển thị tỷ lệ khi có children và có một phần hoàn thành (không phải 0 hoặc 100%)
+        return total > 0 && completed > 0 && completed < total;
+    }
+
     // Check if todo should be hidden (parent is collapsed)
     isHiddenByCollapse(todoId) {
         const todo = this.todos.find(t => t.id === todoId);
@@ -479,6 +766,12 @@ class TodoApp {
     // Project Management Methods
     createProject() {
         const projectName = prompt('Nhập tên project mới:');
+        
+        // Kiểm tra nếu user ấn Cancel (projectName = null)
+        if (projectName === null) {
+            return; // Không hiển thị thông báo lỗi khi Cancel
+        }
+        
         if (!projectName || !projectName.trim()) {
             this.showMessage('Tên project không được để trống!', 'warning');
             return;
@@ -490,7 +783,7 @@ class TodoApp {
         }
 
         const project = {
-            id: Date.now().toString(),
+            id: this.generateId(),
             name: projectName.trim(),
             createdAt: new Date().toISOString(),
             color: this.getRandomProjectColor()
@@ -550,6 +843,7 @@ class TodoApp {
         }
     }
 
+
     archiveProject(projectId) {
         const project = this.projects.find(p => p.id === projectId);
         if (!project) return;
@@ -588,72 +882,71 @@ class TodoApp {
     }
 
     getFilteredTodosForProject(projectId) {
-        // Get all todos that belong to this project or are children of todos in this project
+        // Get all todos that belong to this project
         const projectTodos = this.todos.filter(t => t.projectId === projectId);
-        const allRelatedTodos = new Set();
         
-        // Add project todos
-        projectTodos.forEach(todo => allRelatedTodos.add(todo.id));
-        
-        // Add all children of project todos (regardless of their project)
-        projectTodos.forEach(todo => {
-            const children = this.getAllChildren(todo.id);
-            children.forEach(childId => allRelatedTodos.add(childId));
-        });
-        
-        // Filter the related todos
-        const relatedTodos = this.todos.filter(t => allRelatedTodos.has(t.id));
-        let filtered = [];
+        // First, get todos that match the current filter
+        let matchingTodos = [];
         switch (this.currentFilter) {
             case 'pending':
-                filtered = relatedTodos.filter(t => !t.completed);
+                matchingTodos = projectTodos.filter(t => !t.completed && !t.skipped);
                 break;
-            case 'completed':
-                filtered = relatedTodos.filter(t => t.completed);
-                break;
-            default:
-                filtered = relatedTodos;
+            default: // 'all'
+                matchingTodos = projectTodos; // Hiển thị tất cả (completed, pending, skipped)
         }
+        
+        // Create a set to track all todos we need to show (including parents)
+        const todosToShow = new Set();
+        
+        // Add all matching todos
+        matchingTodos.forEach(todo => todosToShow.add(todo.id));
+        
+        // For each matching todo, add all its parents to maintain hierarchy
+        matchingTodos.forEach(todo => {
+            let currentParentId = todo.parentId;
+            while (currentParentId) {
+                const parent = this.todos.find(t => t.id === currentParentId);
+                if (parent && parent.projectId === projectId) {
+                    todosToShow.add(parent.id);
+                    currentParentId = parent.parentId;
+                } else {
+                break;
+        }
+            }
+        });
+        
+        // Get the final filtered list
+        let filtered = this.todos.filter(t => todosToShow.has(t.id));
         
         // Apply search filter
         if (this.searchQuery) {
-            filtered = filtered.filter(todo => 
+            // Filter by search query first
+            const searchFiltered = filtered.filter(todo => 
                 todo.text.toLowerCase().includes(this.searchQuery)
             );
             
-            // Also include parents of matching children
-            const matchingIds = new Set(filtered.map(t => t.id));
-            const additionalParents = new Set();
+            // Create new set for search results
+            const searchResults = new Set();
             
-            filtered.forEach(todo => {
+            // Add all search matching todos
+            searchFiltered.forEach(todo => searchResults.add(todo.id));
+            
+            // Add all parents of search matching todos to maintain hierarchy
+            searchFiltered.forEach(todo => {
                 let currentParentId = todo.parentId;
                 while (currentParentId) {
                     const parent = this.todos.find(t => t.id === currentParentId);
-                    if (parent && !matchingIds.has(parent.id)) {
-                        additionalParents.add(parent.id);
-                        matchingIds.add(parent.id);
+                    if (parent && parent.projectId === projectId) {
+                        searchResults.add(parent.id);
+                        currentParentId = parent.parentId;
+                    } else {
+                        break;
                     }
-                    currentParentId = parent ? parent.parentId : null;
                 }
             });
             
-            // Add parents to filtered list
-            additionalParents.forEach(parentId => {
-                const parent = this.todos.find(t => t.id === parentId);
-                if (parent) {
-                    // Check if parent matches current filter
-                    switch (this.currentFilter) {
-                        case 'pending':
-                            if (!parent.completed) filtered.push(parent);
-                            break;
-                        case 'completed':
-                            if (parent.completed) filtered.push(parent);
-                            break;
-                        default:
-                            filtered.push(parent);
-                    }
-                }
-            });
+            // Update filtered to only include search results
+            filtered = this.todos.filter(t => searchResults.has(t.id));
         }
         
         // Sắp xếp theo cấu trúc phân cấp
@@ -704,7 +997,15 @@ class TodoApp {
 
     saveProjects() {
         try {
-            localStorage.setItem('projects', JSON.stringify(this.projects));
+            // Thêm timestamp cho mỗi project khi save
+            const projectsWithTimestamp = this.projects.map(project => ({
+                ...project,
+                lastUpdated: new Date().toISOString()
+            }));
+            
+            localStorage.setItem('projects', JSON.stringify(projectsWithTimestamp));
+            this.projects = projectsWithTimestamp; // Cập nhật lại projects với timestamp
+            
             // Đồng bộ với Firebase nếu đã đăng nhập
             if (this.isAuthenticated) {
                 this.saveUserData();
@@ -910,58 +1211,71 @@ class TodoApp {
     }
 
     getFilteredTodos() {
-        const projectTodos = this.getProjectTodos();
-        let filtered = [];
+        // Get all todos for current project
+        const projectTodos = this.todos.filter(t => t.projectId === this.currentProjectId);
+        
+        // First, get todos that match the current filter
+        let matchingTodos = [];
         switch (this.currentFilter) {
             case 'pending':
-                filtered = projectTodos.filter(t => !t.completed);
+                matchingTodos = projectTodos.filter(t => !t.completed && !t.skipped);
                 break;
-            case 'completed':
-                filtered = projectTodos.filter(t => t.completed);
-                break;
-            default:
-                filtered = projectTodos;
+            default: // 'all'
+                matchingTodos = projectTodos; // Hiển thị tất cả (completed, pending, skipped)
         }
+        
+        // Create a set to track all todos we need to show (including parents)
+        const todosToShow = new Set();
+        
+        // Add all matching todos
+        matchingTodos.forEach(todo => todosToShow.add(todo.id));
+        
+        // For each matching todo, add all its parents to maintain hierarchy
+        matchingTodos.forEach(todo => {
+            let currentParentId = todo.parentId;
+            while (currentParentId) {
+                const parent = this.todos.find(t => t.id === currentParentId);
+                if (parent && parent.projectId === this.currentProjectId) {
+                    todosToShow.add(parent.id);
+                    currentParentId = parent.parentId;
+                } else {
+                break;
+        }
+            }
+        });
+        
+        // Get the final filtered list
+        let filtered = this.todos.filter(t => todosToShow.has(t.id));
         
         // Apply search filter
         if (this.searchQuery) {
-            filtered = filtered.filter(todo => 
+            // Filter by search query first
+            const searchFiltered = filtered.filter(todo => 
                 todo.text.toLowerCase().includes(this.searchQuery)
             );
             
-            // Also include parents of matching children
-            const matchingIds = new Set(filtered.map(t => t.id));
-            const additionalParents = new Set();
+            // Create new set for search results
+            const searchResults = new Set();
             
-            filtered.forEach(todo => {
+            // Add all search matching todos
+            searchFiltered.forEach(todo => searchResults.add(todo.id));
+            
+            // Add all parents of search matching todos to maintain hierarchy
+            searchFiltered.forEach(todo => {
                 let currentParentId = todo.parentId;
                 while (currentParentId) {
                     const parent = this.todos.find(t => t.id === currentParentId);
-                    if (parent && !matchingIds.has(parent.id)) {
-                        additionalParents.add(parent.id);
-                        matchingIds.add(parent.id);
+                    if (parent && parent.projectId === this.currentProjectId) {
+                        searchResults.add(parent.id);
+                        currentParentId = parent.parentId;
+                    } else {
+                        break;
                     }
-                    currentParentId = parent ? parent.parentId : null;
                 }
             });
             
-            // Add parents to filtered list
-            additionalParents.forEach(parentId => {
-                const parent = this.todos.find(t => t.id === parentId);
-                if (parent) {
-                    // Check if parent matches current filter
-                    switch (this.currentFilter) {
-                        case 'pending':
-                            if (!parent.completed) filtered.push(parent);
-                            break;
-                        case 'completed':
-                            if (parent.completed) filtered.push(parent);
-                            break;
-                        default:
-                            filtered.push(parent);
-                    }
-                }
-            });
+            // Update filtered to only include search results
+            filtered = this.todos.filter(t => searchResults.has(t.id));
         }
         
         // Sắp xếp theo cấu trúc phân cấp
@@ -1015,11 +1329,11 @@ class TodoApp {
         // Lưu vị trí scroll trước khi render
         const scrollPositions = this.saveScrollPositions();
         
-        // Check if any non-archived project has todos
+        // Check if any non-archived project has todos (or if showing archived filter)
         const hasAnyTodos = this.projects.filter(project => !project.archived).some(project => {
             const projectTodos = this.todos.filter(t => t.projectId === project.id);
             return projectTodos.length > 0;
-        });
+        }) || this.currentFilter === 'archived';
 
         if (!hasAnyTodos) {
             multiProjectContainer.innerHTML = '';
@@ -1029,8 +1343,12 @@ class TodoApp {
 
         emptyState.classList.remove('show');
         
-        // Render todos for each project (excluding archived projects)
-        multiProjectContainer.innerHTML = this.projects.filter(project => !project.archived).map(project => {
+        // Render todos for each project (excluding archived projects, unless showing archived filter)
+        const projectsToRender = this.currentFilter === 'archived' 
+            ? this.projects.filter(project => !project.archived) 
+            : this.projects.filter(project => !project.archived);
+            
+        multiProjectContainer.innerHTML = projectsToRender.map(project => {
             const projectTodos = this.todos.filter(t => t.projectId === project.id);
             const filteredProjectTodos = this.getFilteredTodosForProject(project.id);
             
@@ -1045,7 +1363,7 @@ class TodoApp {
                                 <button class="add-todo-btn" onclick="todoApp.addTodoToProject('${project.id}')" title="Thêm công việc mới">
                                     <i class="fas fa-plus"></i>
                                 </button>
-                                <div class="project-management-actions planner-only">
+                                <div class="project-management-actions">
                                     <button class="project-action-btn edit-project-btn" onclick="todoApp.editProject('${project.id}')" title="Chỉnh sửa project">
                                         <i class="fas fa-edit"></i>
                                     </button>
@@ -1086,51 +1404,41 @@ class TodoApp {
                         parentSelectionClass = 'parent-selection-available';
                     }
                 }
+
+                // Check if this todo can be selected for priority
+                let canBePriorityTarget = false;
+                let prioritySelectionClass = '';
+                
+                if (this.prioritySelectionMode && this.selectedPriorityTodoId) {
+                    const selectedTodo = this.todos.find(t => t.id === this.selectedPriorityTodoId);
+                    if (todo.id === this.selectedPriorityTodoId) {
+                        prioritySelectionClass = 'priority-selection-selected';
+                    } else if (selectedTodo && todo.parentId === selectedTodo.parentId) {
+                        canBePriorityTarget = true;
+                        prioritySelectionClass = 'priority-selection-available';
+                    } else {
+                        prioritySelectionClass = 'priority-selection-unavailable';
+                    }
+                }
                 
                 return `
-                <div class="todo-item ${todo.level > 0 ? `level-${todo.level}` : ''} ${parentSelectionClass}" data-id="${todo.id}" 
-                     ${this.parentSelectionMode && canBeParent ? `onclick="todoApp.selectParent('${todo.id}')"` : ''}>
+                <div class="todo-item ${todo.level > 0 ? `level-${todo.level}` : ''} ${parentSelectionClass} ${prioritySelectionClass}" data-id="${todo.id}" 
+                     ${this.parentSelectionMode && canBeParent ? `onclick="todoApp.selectParent('${todo.id}')"` : ''}
+                     ${this.prioritySelectionMode && canBePriorityTarget ? `onclick="todoApp.selectPriority('${todo.id}')"` : ''}>
                     <div class="todo-content">
-                        <div class="todo-checkbox ${todo.completed ? 'completed' : ''} ${this.isLeafNode(todo.id) ? 'leaf-node' : ''}" 
-                             onclick="todoApp.toggleTodo('${todo.id}')"
-                             ${this.isLeafNode(todo.id) ? 'onmouseenter="todoApp.showTimeBlocksDropdown(event, \'' + todo.id + '\')" onmouseleave="todoApp.hideTimeBlocksDropdown()"' : ''}>
-                            ${todo.completed ? (todo.timeBlocks > 1 ? todo.timeBlocks : '<i class="fas fa-check"></i>') : ''}
-                            ${this.isLeafNode(todo.id) && !todo.completed ? '<div class="time-blocks-dropdown" style="display: none;" onmouseenter="todoApp.cancelHideDropdown()" onmouseleave="todoApp.hideTimeBlocksDropdown()"><span onclick="event.stopPropagation(); todoApp.setTimeBlocks(\'' + todo.id + '\', 2)">2</span><span onclick="event.stopPropagation(); todoApp.setTimeBlocks(\'' + todo.id + '\', 3)">3</span><span onclick="event.stopPropagation(); todoApp.setTimeBlocks(\'' + todo.id + '\', 4)">4</span><span onclick="event.stopPropagation(); todoApp.setTimeBlocks(\'' + todo.id + '\', 5)">5</span><span onclick="event.stopPropagation(); todoApp.setTimeBlocks(\'' + todo.id + '\', 6)">6</span></div>' : ''}
-                        </div>
-                        <div class="todo-text ${todo.completed ? 'completed' : ''}" 
+                        ${this.renderTodoCheckbox(todo)}
+                        <div class="todo-text ${todo.completed ? 'completed' : ''} ${todo.skipped ? 'skipped' : ''}" 
                              ondblclick="todoApp.editTodo('${todo.id}')">
                             <span class="todo-text-content">${this.highlightSearchTerm(todo.text)}</span>
                             ${this.hasChildren(todo.id) ? `
-                                <span class="children-count ${this.isCollapsed(todo.id) ? 'collapsed' : 'expanded'}" 
+                                <span class="children-count ${this.isCollapsed(todo.id) ? 'collapsed' : 'expanded'} ${this.areAllChildrenCompleted(todo.id) ? 'all-completed' : ''} ${this.shouldShowCompletionRatio(todo.id) ? 'partial-completed' : ''}" 
                                       onclick="todoApp.toggleCollapse('${todo.id}')" 
                                       title="${this.isCollapsed(todo.id) ? 'Nhấn để mở rộng' : 'Nhấn để thu gọn'}">
                                     <i class="fas fa-chevron-${this.isCollapsed(todo.id) ? 'right' : 'down'}"></i>
-                                    ${this.getChildrenCount(todo.id)}
+                                    ${this.getChildrenCountDisplay(todo.id)}
                                 </span>
                             ` : ''}
                         </div>
-                    </div>
-                    <div class="todo-actions">
-                        <button class="action-btn add-sub-btn" onclick="todoApp.addSubTodo('${todo.id}')" 
-                                title="Thêm công việc con">
-                            <i class="fas fa-plus"></i>
-                        </button>
-                        <button class="action-btn set-parent-btn" onclick="todoApp.startParentSelection('${todo.id}')" 
-                                title="Chọn cha">
-                            <i class="fas fa-level-up-alt"></i>
-                        </button>
-                        <button class="action-btn make-root-btn" onclick="todoApp.makeRoot('${todo.id}')" 
-                                title="Làm root" ${todo.parentId === null ? 'disabled' : ''}>
-                            <i class="fas fa-home"></i>
-                        </button>
-                        <button class="action-btn edit-btn" onclick="todoApp.editTodo('${todo.id}')" 
-                                title="Chỉnh sửa">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="action-btn delete-btn" onclick="todoApp.deleteTodo('${todo.id}')" 
-                                title="Xóa">
-                            <i class="fas fa-trash"></i>
-                        </button>
                     </div>
                 </div>
                 `;
@@ -1146,7 +1454,7 @@ class TodoApp {
                             <button class="add-todo-btn" onclick="todoApp.addTodoToProject('${project.id}')" title="Thêm công việc mới">
                                 <i class="fas fa-plus"></i>
                             </button>
-                            <div class="project-management-actions planner-only">
+                            <div class="project-management-actions">
                                 <button class="project-action-btn edit-project-btn" onclick="todoApp.editProject('${project.id}')" title="Chỉnh sửa project">
                                     <i class="fas fa-edit"></i>
                                 </button>
@@ -1186,42 +1494,6 @@ class TodoApp {
         // Progress section đã được bỏ, không cần update
     }
 
-    togglePlannerMode() {
-        const body = document.body;
-        
-        if (this.plannerMode) {
-            // Bật Planner Mode
-            body.classList.add('planner-mode-on');
-            
-            // Lưu trạng thái collapse hiện tại
-            this.savedCollapsedState = new Set(this.collapsedTodos);
-            
-            // Uncollapse tất cả todos để hiển thị hết
-            this.collapsedTodos.clear();
-            
-            // Re-render để áp dụng thay đổi
-            this.render();
-        } else {
-            // Tắt Planner Mode
-            body.classList.remove('planner-mode-on');
-            
-            // Khôi phục trạng thái collapse trước đó
-            this.collapsedTodos = new Set(this.savedCollapsedState);
-            
-            // Hide all visible actions
-            document.querySelectorAll('.todo-actions.show').forEach(action => {
-                action.classList.remove('show');
-            });
-            
-            // Cancel parent selection mode if active
-            if (this.parentSelectionMode) {
-                this.cancelParentSelection();
-            }
-            
-            // Re-render để áp dụng thay đổi
-            this.render();
-        }
-    }
 
     saveScrollPositions() {
         const scrollPositions = {};
@@ -1285,6 +1557,25 @@ class TodoApp {
         }
     }
 
+    // Render checkbox hoặc skip icon cho todo
+    renderTodoCheckbox(todo) {
+        if (todo.skipped) {
+            return `
+                <div class="todo-skip-icon" title="Đã skip">
+                    <i class="fas fa-forward"></i>
+                </div>
+            `;
+        } else {
+            return `
+                 <div class="todo-checkbox ${todo.completed ? 'completed' : ''} ${this.isLeafNode(todo.id) ? 'leaf-node' : ''} ${this.areAllChildrenCompleted(todo.id) ? 'all-children-completed' : ''}" 
+                      onclick="event.stopPropagation(); todoApp.toggleTodo('${todo.id}')">
+                     ${todo.completed ? (todo.timeBlocks > 1 ? todo.timeBlocks : '<i class="fas fa-check"></i>') : ''}
+                 </div>
+            `;
+        }
+    }
+
+
     // Render một todo item riêng lẻ
     renderTodoItem(todo, project) {
         // Check if this todo can be selected as parent
@@ -1307,104 +1598,29 @@ class TodoApp {
         <div class="todo-item ${todo.level > 0 ? `level-${todo.level}` : ''} ${parentSelectionClass}" data-id="${todo.id}" 
              ${this.parentSelectionMode && canBeParent ? `onclick="todoApp.selectParent('${todo.id}')"` : ''}>
             <div class="todo-content">
-                <div class="todo-checkbox ${todo.completed ? 'completed' : ''} ${this.isLeafNode(todo.id) ? 'leaf-node' : ''}" 
-                     onclick="todoApp.toggleTodo('${todo.id}')"
-                     ${this.isLeafNode(todo.id) ? 'onmouseenter="todoApp.showTimeBlocksDropdown(event, \'' + todo.id + '\')" onmouseleave="todoApp.hideTimeBlocksDropdown()"' : ''}>
-                    ${todo.completed ? (todo.timeBlocks > 1 ? todo.timeBlocks : '<i class="fas fa-check"></i>') : ''}
-                    ${this.isLeafNode(todo.id) && !todo.completed ? '<div class="time-blocks-dropdown" style="display: none;" onmouseenter="todoApp.cancelHideDropdown()" onmouseleave="todoApp.hideTimeBlocksDropdown()"><span onclick="event.stopPropagation(); todoApp.setTimeBlocks(\'' + todo.id + '\', 2)">2</span><span onclick="event.stopPropagation(); todoApp.setTimeBlocks(\'' + todo.id + '\', 3)">3</span><span onclick="event.stopPropagation(); todoApp.setTimeBlocks(\'' + todo.id + '\', 4)">4</span><span onclick="event.stopPropagation(); todoApp.setTimeBlocks(\'' + todo.id + '\', 5)">5</span><span onclick="event.stopPropagation(); todoApp.setTimeBlocks(\'' + todo.id + '\', 6)">6</span></div>' : ''}
-                </div>
-                <div class="todo-text ${todo.completed ? 'completed' : ''}" 
+                ${this.renderTodoCheckbox(todo)}
+                <div class="todo-text ${todo.completed ? 'completed' : ''} ${todo.skipped ? 'skipped' : ''}" 
                      ondblclick="todoApp.editTodo('${todo.id}')">
                     <span class="todo-text-content">${this.highlightSearchTerm(todo.text)}</span>
                     ${this.hasChildren(todo.id) ? `
-                        <span class="children-count ${this.isCollapsed(todo.id) ? 'collapsed' : 'expanded'}" 
+                        <span class="children-count ${this.isCollapsed(todo.id) ? 'collapsed' : 'expanded'} ${this.areAllChildrenCompleted(todo.id) ? 'all-completed' : ''} ${this.shouldShowCompletionRatio(todo.id) ? 'partial-completed' : ''}" 
                               onclick="todoApp.toggleCollapse('${todo.id}')" 
                               title="${this.isCollapsed(todo.id) ? 'Nhấn để mở rộng' : 'Nhấn để thu gọn'}">
                             <i class="fas fa-chevron-${this.isCollapsed(todo.id) ? 'right' : 'down'}"></i>
-                            ${this.getChildrenCount(todo.id)}
+                            ${this.getChildrenCountDisplay(todo.id)}
                         </span>
                     ` : ''}
                 </div>
-            </div>
-            <div class="todo-actions">
-                <button class="action-btn add-sub-btn" onclick="todoApp.addSubTodo('${todo.id}')" 
-                        title="Thêm công việc con">
-                    <i class="fas fa-plus"></i>
-                </button>
-                <button class="action-btn set-parent-btn" onclick="todoApp.startParentSelection('${todo.id}')" 
-                        title="Chọn cha">
-                    <i class="fas fa-level-up-alt"></i>
-                </button>
-                <button class="action-btn make-root-btn" onclick="todoApp.makeRoot('${todo.id}')" 
-                        title="Làm root" ${todo.parentId === null ? 'disabled' : ''}>
-                    <i class="fas fa-home"></i>
-                </button>
-                <button class="action-btn edit-btn" onclick="todoApp.editTodo('${todo.id}')" 
-                        title="Chỉnh sửa">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button class="action-btn delete-btn" onclick="todoApp.deleteTodo('${todo.id}')" 
-                        title="Xóa">
-                    <i class="fas fa-trash"></i>
-                </button>
             </div>
         </div>
         `;
     }
 
-    showTimeBlocksDropdown(event, todoId) {
-        // Chỉ hiện dropdown cho leaf nodes chưa hoàn thành
-        const todo = this.todos.find(t => t.id === todoId);
-        if (!todo || todo.completed || !this.isLeafNode(todoId)) return;
-        
-        event.stopPropagation();
-        
-        // Clear any existing hide timeout
-        if (this.hideDropdownTimeout) {
-            clearTimeout(this.hideDropdownTimeout);
-            this.hideDropdownTimeout = null;
-        }
-        
-        const dropdown = event.target.querySelector('.time-blocks-dropdown');
-        if (dropdown) {
-            dropdown.style.display = 'flex';
-        }
-    }
 
-    hideTimeBlocksDropdown() {
-        // Delay ẩn dropdown để dễ di chuột
-        this.hideDropdownTimeout = setTimeout(() => {
-            document.querySelectorAll('.time-blocks-dropdown').forEach(dropdown => {
-                dropdown.style.display = 'none';
-            });
-        }, 150); // 150ms delay
-    }
 
-    cancelHideDropdown() {
-        // Hủy việc ẩn dropdown khi hover vào dropdown
-        if (this.hideDropdownTimeout) {
-            clearTimeout(this.hideDropdownTimeout);
-            this.hideDropdownTimeout = null;
-        }
-    }
 
-    togglePlannerModeFromDoubleClick() {
-        // Toggle planner mode
-        this.plannerMode = !this.plannerMode;
-        
-        // Update checkbox state
-        const plannerModeCheckbox = document.getElementById('plannerMode');
-        if (plannerModeCheckbox) {
-            plannerModeCheckbox.checked = this.plannerMode;
-        }
-        
-        // Apply the toggle
-        this.togglePlannerMode();
-        
-        // Show message
-        const message = this.plannerMode ? 'Đã bật Planner Mode!' : 'Đã tắt Planner Mode!';
-        this.showMessage(message, 'success');
-    }
+
+
 
     showMessage(message, type = 'info') {
         // Remove existing messages
@@ -1518,7 +1734,15 @@ class TodoApp {
 
     saveTodos() {
         try {
-            localStorage.setItem('todos', JSON.stringify(this.todos));
+            // Thêm timestamp cho mỗi todo khi save
+            const todosWithTimestamp = this.todos.map(todo => ({
+                ...todo,
+                lastUpdated: new Date().toISOString()
+            }));
+            
+            localStorage.setItem('todos', JSON.stringify(todosWithTimestamp));
+            this.todos = todosWithTimestamp; // Cập nhật lại todos với timestamp
+            
             // Đồng bộ với Firebase nếu đã đăng nhập
             if (this.isAuthenticated) {
                 this.saveUserData();
@@ -1543,13 +1767,31 @@ class TodoApp {
                 if (!todo.timeBlocks) {
                     todo.timeBlocks = 1; // Default 1 block
                 }
+                if (todo.skipped === undefined) {
+                    todo.skipped = false; // Default not skipped
+                }
+                if (todo.order === undefined) {
+                    todo.order = 0; // Default order
+                }
                 return todo;
             });
+            
+            // Assign proper order for todos without order field
+            const needsOrderAssignment = migratedTodos.some(todo => {
+                const original = todos.find(t => t.id === todo.id);
+                return original?.order === undefined;
+            });
+            
+            if (needsOrderAssignment) {
+                console.log('Assigning order to todos...');
+                this.assignOrderToAllTodos(migratedTodos);
+                console.log('Order assigned:', migratedTodos.map(t => ({ text: t.text, order: t.order, parentId: t.parentId })));
+            }
             
             // Save migrated todos if there were changes
             if (migratedTodos.some(todo => {
                 const original = todos.find(t => t.id === todo.id);
-                return !original?.projectId || !original?.timeBlocks;
+                return !original?.projectId || !original?.timeBlocks || original?.skipped === undefined || original?.order === undefined;
             })) {
                 this.todos = migratedTodos;
                 this.saveTodos();
@@ -1583,8 +1825,8 @@ class TodoApp {
                 this.firebaseDB = window.firebaseDB;
                 this.googleProvider = window.googleProvider;
                 
-                console.log('Firebase initialized successfully, setting up auth listeners');
-                this.setupAuthListeners();
+                    console.log('Firebase initialized successfully, setting up auth listeners');
+                    this.setupAuthListeners();
             } else if (attempts < maxAttempts) {
                 setTimeout(checkFirebase, 100);
             } else {
@@ -1708,9 +1950,16 @@ class TodoApp {
     async loadUserData() {
         if (!this.isAuthenticated || !this.user) return;
         
-        // Hiển thị loading message
-        this.showLoadingMessage('Đang tải dữ liệu từ Firebase...');
+        // Hiển thị dữ liệu local ngay lập tức
+        this.render();
+        this.updateStats();
+        console.log('Đã hiển thị dữ liệu local');
         
+        // Đồng bộ với Firebase ở background
+        this.syncWithFirebaseInBackground();
+    }
+
+    async syncWithFirebaseInBackground() {
         try {
             // Import Firestore functions
             const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
@@ -1719,30 +1968,103 @@ class TodoApp {
             
             if (userDoc.exists()) {
                 const userData = userDoc.data();
-                this.projects = userData.projects || [];
-                this.todos = userData.todos || [];
-                this.currentProjectId = userData.currentProjectId || null;
+                const firebaseProjects = userData.projects || [];
+                const firebaseTodos = userData.todos || [];
+                const firebaseCurrentProjectId = userData.currentProjectId || null;
                 
-                // Ẩn loading message và render lại với dữ liệu từ Firebase
-                this.hideLoadingMessage();
-                this.render();
-                this.updateStats();
-                console.log('Đã tải dữ liệu từ Firebase');
+                // So sánh và merge dữ liệu
+                const mergedData = this.mergeLocalAndFirebaseData(
+                    { projects: this.projects, todos: this.todos, currentProjectId: this.currentProjectId },
+                    { projects: firebaseProjects, todos: firebaseTodos, currentProjectId: firebaseCurrentProjectId }
+                );
+                
+                // Cập nhật dữ liệu nếu có thay đổi
+                if (this.hasDataChanged(mergedData)) {
+                    this.projects = mergedData.projects;
+                    this.todos = mergedData.todos;
+                    this.currentProjectId = mergedData.currentProjectId;
+                    
+                    // Lưu dữ liệu đã merge
+                    this.saveTodos();
+                    this.saveProjects();
+                    this.saveCurrentProject();
+                    
+                    // Render lại với dữ liệu mới
+                    this.render();
+                    this.updateStats();
+                    
+                    console.log('Đã đồng bộ và merge dữ liệu từ Firebase');
+                    this.showMessage('Đã đồng bộ dữ liệu từ Firebase', 'success');
+                } else {
+                    // Lưu dữ liệu local lên Firebase nếu không có thay đổi
+                    await this.saveUserData();
+                    console.log('Đã đồng bộ dữ liệu local lên Firebase');
+                }
             } else {
-                // Lưu dữ liệu local lên Firebase nếu user mới
-                this.showLoadingMessage('Đang đồng bộ dữ liệu lên Firebase...');
+                // User mới - lưu dữ liệu local lên Firebase
                 await this.saveUserData();
-                this.hideLoadingMessage();
-                this.render();
-                this.updateStats();
+                console.log('Đã tạo user mới và lưu dữ liệu lên Firebase');
             }
         } catch (error) {
-            console.error('Lỗi tải dữ liệu:', error);
-            this.hideLoadingMessage();
-            this.render();
-            this.updateStats();
-            this.showMessage('Lỗi tải dữ liệu từ Firebase', 'error');
+            console.error('Lỗi đồng bộ Firebase:', error);
+            this.showMessage('Lỗi đồng bộ dữ liệu với Firebase', 'warning');
         }
+    }
+
+    mergeLocalAndFirebaseData(localData, firebaseData) {
+        // Merge projects - ưu tiên dữ liệu mới hơn
+        const mergedProjects = [...localData.projects];
+        firebaseData.projects.forEach(firebaseProject => {
+            const localIndex = mergedProjects.findIndex(p => p.id === firebaseProject.id);
+            if (localIndex >= 0) {
+                // So sánh thời gian cập nhật
+                const localUpdated = new Date(localData.projects[localIndex].lastUpdated || localData.projects[localIndex].createdAt);
+                const firebaseUpdated = new Date(firebaseProject.lastUpdated || firebaseProject.createdAt);
+                
+                if (firebaseUpdated > localUpdated) {
+                    mergedProjects[localIndex] = firebaseProject;
+                }
+            } else {
+                // Project mới từ Firebase
+                mergedProjects.push(firebaseProject);
+            }
+        });
+
+        // Merge todos - ưu tiên dữ liệu mới hơn
+        const mergedTodos = [...localData.todos];
+        firebaseData.todos.forEach(firebaseTodo => {
+            const localIndex = mergedTodos.findIndex(t => t.id === firebaseTodo.id);
+            if (localIndex >= 0) {
+                // So sánh thời gian cập nhật
+                const localUpdated = new Date(localData.todos[localIndex].lastUpdated || localData.todos[localIndex].createdAt);
+                const firebaseUpdated = new Date(firebaseTodo.lastUpdated || firebaseTodo.createdAt);
+                
+                if (firebaseUpdated > localUpdated) {
+                    mergedTodos[localIndex] = firebaseTodo;
+                }
+            } else {
+                // Todo mới từ Firebase
+                mergedTodos.push(firebaseTodo);
+            }
+        });
+
+        // Merge currentProjectId - ưu tiên Firebase nếu có
+        const mergedCurrentProjectId = firebaseData.currentProjectId || localData.currentProjectId;
+
+        return {
+            projects: mergedProjects,
+            todos: mergedTodos,
+            currentProjectId: mergedCurrentProjectId
+        };
+    }
+
+    hasDataChanged(mergedData) {
+        // Kiểm tra xem có thay đổi gì không
+        const projectsChanged = JSON.stringify(this.projects) !== JSON.stringify(mergedData.projects);
+        const todosChanged = JSON.stringify(this.todos) !== JSON.stringify(mergedData.todos);
+        const currentProjectChanged = this.currentProjectId !== mergedData.currentProjectId;
+        
+        return projectsChanged || todosChanged || currentProjectChanged;
     }
 
     async saveUserData() {
@@ -1808,6 +2130,151 @@ class TodoApp {
             }
         }
     }
+
+    // Context Menu Methods
+    handleContextMenu(e) {
+        // Ngăn menu mặc định của browser
+        e.preventDefault();
+        
+        // Kiểm tra xem có click vào todo item không
+        const todoItem = e.target.closest('.todo-item');
+        if (todoItem) {
+            const todoId = todoItem.dataset.id;
+            this.showContextMenu(e, todoId);
+        } else {
+            // Click vào vùng trống - hiện context menu chung
+            this.showContextMenu(e, null);
+        }
+    }
+
+    showContextMenu(e, todoId) {
+        // Đóng context menu cũ nếu có
+        this.closeContextMenu();
+        
+        // Tạo context menu
+        const contextMenu = document.createElement('div');
+        contextMenu.className = 'custom-context-menu';
+        contextMenu.id = 'customContextMenu';
+        
+        // Ngăn event bubbling
+        contextMenu.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+        
+        if (todoId) {
+            // Context menu cho todo item
+            const todo = this.todos.find(t => t.id === todoId);
+            if (!todo) return;
+            
+            contextMenu.innerHTML = `
+                <div class="context-menu-time-blocks">
+                    <button class="context-time-btn" onclick="event.stopPropagation(); todoApp.setTimeBlocks('${todoId}', 2)" title="2 blocks (10 phút)">2</button>
+                    <button class="context-time-btn" onclick="event.stopPropagation(); todoApp.setTimeBlocks('${todoId}', 3)" title="3 blocks (15 phút)">3</button>
+                    <button class="context-time-btn" onclick="event.stopPropagation(); todoApp.setTimeBlocks('${todoId}', 4)" title="4 blocks (20 phút)">4</button>
+                    <button class="context-time-btn" onclick="event.stopPropagation(); todoApp.setTimeBlocks('${todoId}', 5)" title="5 blocks (25 phút)">5</button>
+                    <button class="context-time-btn" onclick="event.stopPropagation(); todoApp.setTimeBlocks('${todoId}', 6)" title="6 blocks (30 phút)">6</button>
+                    <button class="context-skip-btn" onclick="event.stopPropagation(); todoApp.skipTodo('${todoId}')" title="Skip">
+                        <i class="fas fa-forward"></i>
+                    </button>
+                </div>
+                <div class="context-menu-divider"></div>
+                <div class="context-menu-item" onclick="todoApp.editTodo('${todoId}')">
+                    <i class="fas fa-edit"></i>
+                    Chỉnh sửa
+                </div>
+                <div class="context-menu-item" onclick="todoApp.addSubTodo('${todoId}')">
+                    <i class="fas fa-plus"></i>
+                    Thêm sub
+                </div>
+                <div class="context-menu-item" onclick="todoApp.startParentSelection('${todoId}')">
+                    <i class="fas fa-level-up-alt"></i>
+                    Cha con
+                </div>
+                <div class="context-menu-item" onclick="todoApp.startPrioritySelection('${todoId}')">
+                    <i class="fas fa-exclamation"></i>
+                    Ưu tiên
+                </div>
+                <div class="context-menu-item" onclick="todoApp.duplicateTodo('${todoId}')">
+                    <i class="fas fa-copy"></i>
+                    Nhân bản
+                </div>
+                <div class="context-menu-item ${todo.parentId === null ? 'disabled' : ''}" onclick="${todo.parentId === null ? '' : `todoApp.makeRoot('${todoId}')`}">
+                    <i class="fas fa-home"></i>
+                    Làm root
+                </div>
+                <div class="context-menu-divider"></div>
+                <div class="context-menu-item" onclick="todoApp.deleteTodo('${todoId}')">
+                    <i class="fas fa-trash"></i>
+                    Xóa
+                </div>
+            `;
+        } else {
+            // Context menu cho vùng trống
+            const currentProject = this.getCurrentProject();
+            if (currentProject) {
+                contextMenu.innerHTML = `
+                    <div class="context-menu-item" onclick="todoApp.addTodoToProject('${currentProject.id}')">
+                        <i class="fas fa-plus"></i>
+                        Thêm công việc
+                    </div>
+                    <div class="context-menu-item" onclick="todoApp.createProject()">
+                        <i class="fas fa-folder-plus"></i>
+                        Tạo project
+                    </div>
+                    <div class="context-menu-divider"></div>
+                    <div class="context-menu-item" onclick="todoApp.syncData()">
+                        <i class="fas fa-sync-alt"></i>
+                        Đồng bộ dữ liệu
+                    </div>
+                `;
+            }
+        }
+        
+        // Đặt vị trí context menu
+        const x = e.clientX;
+        const y = e.clientY;
+        
+        contextMenu.style.left = `${x}px`;
+        contextMenu.style.top = `${y}px`;
+        
+        // Kiểm tra nếu menu bị tràn ra ngoài màn hình
+        document.body.appendChild(contextMenu);
+        
+        const rect = contextMenu.getBoundingClientRect();
+        if (rect.right > window.innerWidth) {
+            contextMenu.style.left = `${x - rect.width}px`;
+        }
+        if (rect.bottom > window.innerHeight) {
+            contextMenu.style.top = `${y - rect.height}px`;
+        }
+        
+        // Hiển thị với animation
+        setTimeout(() => {
+            contextMenu.classList.add('show');
+        }, 10);
+        
+        // Đóng context menu sau khi thực hiện action
+        contextMenu.addEventListener('click', (e) => {
+            if (e.target.closest('.context-menu-item')) {
+                setTimeout(() => {
+                    this.closeContextMenu();
+                }, 100);
+            }
+        });
+    }
+
+    closeContextMenu() {
+        const contextMenu = document.getElementById('customContextMenu');
+        if (contextMenu) {
+            contextMenu.classList.remove('show');
+            setTimeout(() => {
+                if (contextMenu.parentNode) {
+                    contextMenu.remove();
+                }
+            }, 200);
+        }
+    }
+
 }
 
 // Initialize the app when DOM is loaded

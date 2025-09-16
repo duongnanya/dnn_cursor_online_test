@@ -77,28 +77,16 @@
                     </button>
                 </div>
                 <div class="filter-buttons">
-                    <button class="filter-btn active" data-filter="all">
-                        <i class="fas fa-list"></i> Tất cả
-                    </button>
-                    <button class="filter-btn" data-filter="pending">
+                    <button class="filter-btn active" data-filter="pending">
                         <i class="fas fa-clock"></i> Còn
                     </button>
-                    <button class="filter-btn" data-filter="completed">
-                        <i class="fas fa-check"></i> Xong
+                    <button class="filter-btn" data-filter="all">
+                        <i class="fas fa-list"></i> Tất cả
                     </button>
                 </div>
-                <button class="create-project-btn planner-only" onclick="todoApp.createProject()">
-                    <i class="fas fa-plus"></i> Tạo Project
-                </button>
                 <button class="calendar-btn" onclick="todoApp.goToCalendar()">
                     <i class="fas fa-calendar-alt"></i> Calendar
                 </button>
-                <div class="planner-mode-toggle">
-                    <input type="checkbox" id="plannerMode" class="planner-mode-checkbox">
-                    <label for="plannerMode" class="planner-mode-label">
-                        <i class="fas fa-sitemap"></i> Planner Mode
-                    </label>
-                </div>
                 
                 <!-- User Avatar với Menu -->
                 <div class="user-avatar-container">
@@ -112,6 +100,10 @@
                             </div>
                         </div>
                         <div class="menu-divider"></div>
+                        <button class="menu-item" id="createProjectBtn">
+                            <i class="fas fa-plus"></i>
+                            Tạo Project
+                        </button>
                         <button class="menu-item" id="syncBtn">
                             <i class="fas fa-sync-alt"></i>
                             Đồng bộ dữ liệu
