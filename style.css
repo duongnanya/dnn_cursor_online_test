@@ -1748,6 +1748,16 @@ body {
     color: #4CAF50;
 }
 
+.context-menu-item:has(.fa-arrow-up):hover {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.1), rgba(76, 175, 80, 0.05));
+    color: #4CAF50;
+}
+
+.context-menu-item:has(.fa-arrow-down):hover {
+    background: linear-gradient(135deg, rgba(33, 150, 243, 0.1), rgba(33, 150, 243, 0.05));
+    color: #2196F3;
+}
+
 .context-menu-item:has(.fa-copy):hover {
     background: linear-gradient(135deg, rgba(23, 162, 184, 0.1), rgba(23, 162, 184, 0.05));
     color: #17a2b8;

@@ -22,18 +22,14 @@ class TodoApp {
         this.firebaseDB = null;
         this.googleProvider = null;
         
-        this.init();
+        this.init(); // Không await vì constructor không thể async
     }
 
     init() {
         this.bindEvents();
         this.initFirebase();
-        // Kiểm tra dữ liệu local trước khi check auth
-        if (this.hasLocalData()) {
-            this.showMainApp();
-            this.loadLocalData();
-        }
-        this.checkAuthState();
+        // Đợi Firebase khởi tạo xong mới xử lý UI
+        // Logic hiển thị UI sẽ được xử lý trong handleAuthStateChange()
     }
 
     bindEvents() {
@@ -68,6 +64,7 @@ class TodoApp {
         if (logoutBtn) {
             logoutBtn.addEventListener('click', () => {
                 this.signOut();
+                this.closeUserMenu(); // Đóng user menu sau khi logout
             });
         }
         
@@ -206,10 +203,14 @@ class TodoApp {
         };
         
         this.todos.unshift(newTodo);
-        this.saveTodos();
+        
+        // Cập nhật UI ngay lập tức
         this.render();
         this.updateStats();
         this.showMessage('Đã thêm công việc mới!', 'success');
+        
+        // Sync Firebase ở background
+        this.saveTodos();
     }
 
     toggleTodo(id) {
@@ -228,12 +229,15 @@ class TodoApp {
                 delete todo.completedAt;
             }
             
-            this.saveTodos();
+            // Cập nhật UI ngay lập tức
             this.updateTodoItem(id); // Chỉ update todo item cụ thể
             this.updateStats();
             
             const message = todo.completed ? 'Đã xong!' : 'Đã bỏ đánh dấu xong!';
             this.showMessage(message, 'success');
+            
+            // Sync Firebase ở background
+            this.saveTodos();
         } else {
             console.error('Todo not found with id:', id);
         }
@@ -254,12 +258,15 @@ class TodoApp {
             todo.timeBlocks = timeValue;
             todo.completed = true; // Tự động đánh dấu hoàn thành khi set time blocks
             todo.completedAt = new Date().toISOString();
-            this.saveTodos();
+            // Cập nhật UI ngay lập tức
             this.updateTodoItem(id);
             this.updateStats();
             
             const displayText = timeValue === 60 ? '1h' : timeValue === 120 ? '2h' : `${timeValue} phút`;
             this.showMessage(`Đã set ${displayText}!`, 'success');
+            
+            // Sync Firebase ở background
+            this.saveTodos();
         }
     }
 
@@ -269,10 +276,13 @@ class TodoApp {
             const todosToDelete = this.getAllChildren(id);
             todosToDelete.push(id);
             this.todos = this.todos.filter(t => !todosToDelete.includes(t.id));
-            this.saveTodos();
+            // Cập nhật UI ngay lập tức
             this.render();
             this.updateStats();
             this.showMessage('Đã xóa công việc!', 'success');
+            
+            // Sync Firebase ở background
+            this.saveTodos();
         }
     }
 
@@ -299,13 +309,16 @@ class TodoApp {
             }
         });
 
-        this.saveTodos();
+        // Cập nhật UI ngay lập tức
         this.render();
         
         const message = childrenCount > 0 
             ? `Đã skip todo và ${childrenCount} công việc con!`
             : 'Đã skip todo!';
         this.showMessage(message, 'success');
+        
+        // Sync Firebase ở background
+        this.saveTodos();
     }
 
 
@@ -350,7 +363,7 @@ class TodoApp {
         const parentTodo = this.todos.find(t => t.id === parentId);
         if (!parentTodo) return;
 
-        const text = prompt(`Thêm công việc con cho "${parentTodo.text}":`);
+        const text = prompt(`Thêm bước con cho "${parentTodo.text}":`);
         if (text && text.trim()) {
             if (text.trim().length > 100) {
                 this.showMessage('Nội dung công việc quá dài (tối đa 100 ký tự)!', 'warning');
@@ -376,10 +389,119 @@ class TodoApp {
             };
 
             this.todos.unshift(todo);
-            this.saveTodos();
+            
+            // Cập nhật UI ngay lập tức
             this.render();
             this.updateStats();
-            this.showMessage('Đã thêm công việc con!', 'success');
+            this.showMessage('Đã thêm bước con!', 'success');
+            
+            // Sync Firebase ở background
+            this.saveTodos();
+        }
+    }
+
+    addSiblingTodoBefore(siblingId) {
+        const siblingTodo = this.todos.find(t => t.id === siblingId);
+        if (!siblingTodo) return;
+
+        const text = prompt(`Thêm bước trước "${siblingTodo.text}":`);
+        if (text && text.trim()) {
+            if (text.trim().length > 100) {
+                this.showMessage('Nội dung công việc quá dài (tối đa 100 ký tự)!', 'warning');
+                return;
+            }
+
+            // Tìm siblings (cùng parent và project) và sắp xếp theo order
+            const siblings = this.todos.filter(todo => 
+                todo.parentId === siblingTodo.parentId && 
+                todo.projectId === siblingTodo.projectId
+            ).sort((a, b) => a.order - b.order);
+
+            // Tìm vị trí của sibling hiện tại
+            const siblingIndex = siblings.findIndex(todo => todo.id === siblingId);
+            
+            // Tạo todo mới với cùng level và parent
+            const newTodo = {
+                id: this.generateId(),
+                text: text.trim(),
+                completed: false,
+                parentId: siblingTodo.parentId,
+                level: siblingTodo.level,
+                order: siblingTodo.order, // Cùng order với sibling
+                projectId: siblingTodo.projectId,
+                createdAt: new Date().toISOString(),
+                timeBlocks: 1, // Default 1 block (5 phút)
+                skipped: false // Default not skipped
+            };
+
+            // Tăng order của sibling và các siblings sau nó
+            siblings.forEach(todo => {
+                if (todo.order >= siblingTodo.order) {
+                    todo.order += 1;
+                }
+            });
+
+            // Thêm todo mới vào danh sách
+            this.todos.push(newTodo);
+            
+            // Cập nhật UI ngay lập tức
+            this.render();
+            this.updateStats();
+            this.showMessage('Đã thêm bước trước!', 'success');
+            
+            // Sync Firebase ở background
+            this.saveTodos();
+        }
+    }
+
+    addSiblingTodoAfter(siblingId) {
+        const siblingTodo = this.todos.find(t => t.id === siblingId);
+        if (!siblingTodo) return;
+
+        const text = prompt(`Thêm bước sau "${siblingTodo.text}":`);
+        if (text && text.trim()) {
+            if (text.trim().length > 100) {
+                this.showMessage('Nội dung công việc quá dài (tối đa 100 ký tự)!', 'warning');
+                return;
+            }
+
+            // Tìm siblings (cùng parent và project) và sắp xếp theo order
+            const siblings = this.todos.filter(todo => 
+                todo.parentId === siblingTodo.parentId && 
+                todo.projectId === siblingTodo.projectId
+            ).sort((a, b) => a.order - b.order);
+
+            // Tạo todo mới với cùng level và parent
+            const newTodo = {
+                id: this.generateId(),
+                text: text.trim(),
+                completed: false,
+                parentId: siblingTodo.parentId,
+                level: siblingTodo.level,
+                order: siblingTodo.order + 1, // Order sau sibling
+                projectId: siblingTodo.projectId,
+                createdAt: new Date().toISOString(),
+                timeBlocks: 1, // Default 1 block (5 phút)
+                skipped: false // Default not skipped
+            };
+
+            // Tăng order của các siblings sau sibling hiện tại
+            siblings.forEach(todo => {
+                if (todo.order > siblingTodo.order) {
+                    todo.order += 1;
+                }
+            });
+
+            // Thêm todo mới vào danh sách
+            this.todos.push(newTodo);
+            
+            // Cập nhật UI ngay lập tức
+            this.render();
+            this.updateStats();
+            this.showMessage('Đã thêm bước sau!', 'success');
+            
+            // Sync Firebase ở background
+            this.saveTodos();
         }
     }
 
@@ -394,9 +516,13 @@ class TodoApp {
                 return;
             }
             todo.text = newText.trim();
-            this.saveTodos();
+            
+            // Cập nhật UI ngay lập tức
             this.render();
             this.showMessage('Đã cập nhật công việc!', 'success');
+            
+            // Sync Firebase ở background
+            this.saveTodos();
         }
     }
 
@@ -457,9 +583,13 @@ class TodoApp {
         // Make the relationship
         this.makeChildOf(childId, parentId);
         this.cancelParentSelection();
-        this.saveTodos();
+        
+        // Cập nhật UI ngay lập tức
         this.render();
         this.showMessage('Đã tạo quan hệ cha-con thành công!', 'success');
+        
+        // Sync Firebase ở background
+        this.saveTodos();
     }
 
     // Select priority position
@@ -504,10 +634,14 @@ class TodoApp {
                 .sort((a, b) => a.order - b.order)
         });
         
-        this.saveTodos();
         this.cancelPrioritySelection();
+        
+        // Cập nhật UI ngay lập tức
         this.render();
         this.showMessage('Đã sắp xếp thứ tự ưu tiên!', 'success');
+        
+        // Sync Firebase ở background
+        this.saveTodos();
     }
 
     // Normalize order for siblings to ensure integer sequence
@@ -623,9 +757,12 @@ class TodoApp {
         // Update level for all children of this todo
         this.updateChildrenLevel(todoId);
 
-        this.saveTodos();
+        // Cập nhật UI ngay lập tức
         this.render();
         this.showMessage('Đã chuyển todo thành root!', 'success');
+        
+        // Sync Firebase ở background
+        this.saveTodos();
     }
 
     // Toggle collapse/uncollapse for todo children
@@ -687,9 +824,12 @@ class TodoApp {
         // Copy tất cả children theo đúng phân cấp
         this.duplicateChildren(todoId, duplicatedTodo.id, idMapping);
         
-        this.saveTodos();
+        // Cập nhật UI ngay lập tức
         this.render();
         this.showMessage(`Đã nhân bản "${originalTodo.text}" và ${this.getChildrenCount(todoId)} công việc con!`, 'success');
+        
+        // Sync Firebase ở background
+        this.saveTodos();
     }
 
     // Tạo todo được copy với suffix "copied" (chỉ cho todo gốc)
@@ -849,10 +989,14 @@ class TodoApp {
 
         this.projects.push(project);
         this.currentProjectId = project.id;
-        this.saveProjects();
-        this.saveCurrentProject();
+        
+        // Cập nhật UI ngay lập tức
         this.render();
         this.showMessage('Đã tạo project mới!', 'success');
+        
+        // Sync Firebase ở background
+        this.saveProjects();
+        this.saveCurrentProject();
     }
 
     deleteProject(projectId) {
@@ -874,12 +1018,15 @@ class TodoApp {
             // Switch to first available project
             this.currentProjectId = this.projects[0].id;
             
-            this.saveProjects();
-            this.saveCurrentProject();
-            this.saveTodos();
+            // Cập nhật UI ngay lập tức
             this.render();
             this.updateStats();
             this.showMessage('Đã xóa project!', 'success');
+            
+            // Sync Firebase ở background
+            this.saveProjects();
+            this.saveCurrentProject();
+            this.saveTodos();
         }
     }
 
@@ -895,9 +1042,13 @@ class TodoApp {
             }
             
             project.name = newName.trim();
-            this.saveProjects();
+            
+            // Cập nhật UI ngay lập tức
             this.render();
             this.showMessage('Đã cập nhật tên project!', 'success');
+            
+            // Sync Firebase ở background
+            this.saveProjects();
         }
     }
 
@@ -917,10 +1068,13 @@ class TodoApp {
                 delete project.archivedAt;
             }
             
-            this.saveProjects();
+            // Cập nhật UI ngay lập tức
             this.render();
             const message = project.archived ? 'Đã lưu trữ project!' : 'Đã khôi phục project!';
             this.showMessage(message, 'success');
+            
+            // Sync Firebase ở background
+            this.saveProjects();
         }
     }
 
@@ -964,10 +1118,10 @@ class TodoApp {
                                         </p>
                                     </div>
                                     <div class="archived-project-actions">
-                                        <button class="btn-restore" onclick="todoApp.restoreProject('${project.id}'); todoApp.closeModal(this.closest('.modal-overlay'));" title="Khôi phục project">
+                                        <button class="btn-restore" onclick="todoApp.handleAsyncCall(todoApp.restoreProject, '${project.id}'); todoApp.closeModal(this.closest('.modal-overlay'));" title="Khôi phục project">
                                             <i class="fas fa-undo"></i> Khôi phục
                                         </button>
-                                        <button class="btn-delete" onclick="todoApp.deleteArchivedProject('${project.id}'); todoApp.closeModal(this.closest('.modal-overlay'));" title="Xóa vĩnh viễn">
+                                        <button class="btn-delete" onclick="todoApp.handleAsyncCall(todoApp.deleteArchivedProject, '${project.id}'); todoApp.closeModal(this.closest('.modal-overlay'));" title="Xóa vĩnh viễn">
                                             <i class="fas fa-trash"></i> Xóa
                                         </button>
                                     </div>
@@ -996,15 +1150,28 @@ class TodoApp {
         }, 300); // Match animation duration
     }
 
+    // Helper method để handle async calls từ onclick handlers
+    handleAsyncCall(asyncFn, ...args) {
+        try {
+            asyncFn.apply(this, args);
+        } catch (error) {
+            console.error('Error in async call:', error);
+            this.showMessage('Có lỗi xảy ra!', 'error');
+        }
+    }
+
     restoreProject(projectId) {
         const project = this.projects.find(p => p.id === projectId);
         if (!project) return;
 
         project.archived = false;
         delete project.archivedAt;
-        this.saveProjects();
+        // Cập nhật UI ngay lập tức
         this.render();
         this.showMessage(`Đã khôi phục project "${project.name}"!`, 'success');
+        
+        // Sync Firebase ở background
+        this.saveProjects();
     }
 
     deleteArchivedProject(projectId) {
@@ -1029,18 +1196,25 @@ class TodoApp {
                 this.saveCurrentProject();
             }
             
-            this.saveTodos();
-            this.saveProjects();
+            // Cập nhật UI ngay lập tức
             this.render();
             this.showMessage(`Đã xóa vĩnh viễn project "${project.name}"!`, 'success');
+            
+            // Sync Firebase ở background
+            this.saveTodos();
+            this.saveProjects();
         }
     }
 
     switchProject(projectId) {
         this.currentProjectId = projectId;
-        this.saveCurrentProject();
+        
+        // Cập nhật UI ngay lập tức
         this.render();
         this.updateStats();
+        
+        // Sync Firebase ở background
+        this.saveCurrentProject();
     }
 
     getCurrentProject() {
@@ -1178,7 +1352,7 @@ class TodoApp {
         }
     }
 
-    saveProjects() {
+    async saveProjects() {
         try {
             // Thêm timestamp cho mỗi project khi save
             const projectsWithTimestamp = this.projects.map(project => ({
@@ -1191,7 +1365,7 @@ class TodoApp {
             
             // Đồng bộ với Firebase nếu đã đăng nhập
             if (this.isAuthenticated) {
-                this.saveUserData();
+                await this.saveUserData();
             }
         } catch (error) {
             console.error('Error saving projects:', error);
@@ -1208,12 +1382,12 @@ class TodoApp {
         }
     }
 
-    saveCurrentProject() {
+    async saveCurrentProject() {
         try {
             localStorage.setItem('currentProjectId', this.currentProjectId);
             // Đồng bộ với Firebase nếu đã đăng nhập
             if (this.isAuthenticated) {
-                this.saveUserData();
+                await this.saveUserData();
             }
         } catch (error) {
             console.error('Error saving current project:', error);
@@ -1232,12 +1406,12 @@ class TodoApp {
 
             return `
                 <div class="project-card ${isActive ? 'active' : ''}" 
-                     onclick="todoApp.switchProject('${project.id}')">
+                     onclick="todoApp.handleAsyncCall(todoApp.switchProject, '${project.id}')">
                     <div class="project-header" style="background: ${project.color}">
                         <h3 class="project-title">${project.name}</h3>
                         ${this.projects.length > 1 ? `
                             <button class="project-delete-btn" 
-                                    onclick="event.stopPropagation(); todoApp.deleteProject('${project.id}')" 
+                                    onclick="event.stopPropagation(); todoApp.handleAsyncCall(todoApp.deleteProject, '${project.id}')" 
                                     title="Xóa project">
                                 <i class="fas fa-trash"></i>
                             </button>
@@ -1392,10 +1566,14 @@ class TodoApp {
             });
             
             this.selectedTodos.clear();
-            this.saveTodos();
+            
+            // Cập nhật UI ngay lập tức
             this.render();
             this.updateStats();
             this.showMessage(`Đã xóa ${selectedArray.length} công việc!`, 'success');
+            
+            // Sync Firebase ở background
+            this.saveTodos();
         }
     }
 
@@ -1570,18 +1748,18 @@ class TodoApp {
                                 <h3 class="project-title-small">${project.name} <span class="project-todo-count-small">(${projectTodos.length})</span></h3>
                             </div>
                             <div class="project-actions">
-                                <button class="add-todo-btn" onclick="todoApp.addTodoToProject('${project.id}')" title="Thêm công việc mới">
+                                <button class="add-todo-btn" onclick="todoApp.handleAsyncCall(todoApp.addTodoToProject, '${project.id}')" title="Thêm công việc mới">
                                     <i class="fas fa-plus"></i>
                                 </button>
                                 <div class="project-management-actions">
-                                    <button class="project-action-btn edit-project-btn" onclick="todoApp.editProject('${project.id}')" title="Chỉnh sửa project">
+                                    <button class="project-action-btn edit-project-btn" onclick="todoApp.handleAsyncCall(todoApp.editProject, '${project.id}')" title="Chỉnh sửa project">
                                         <i class="fas fa-edit"></i>
                                     </button>
-                                    <button class="project-action-btn archive-project-btn" onclick="todoApp.archiveProject('${project.id}')" title="Lưu trữ project">
+                                    <button class="project-action-btn archive-project-btn" onclick="todoApp.handleAsyncCall(todoApp.archiveProject, '${project.id}')" title="Lưu trữ project">
                                         <i class="fas fa-archive"></i>
                                     </button>
                                     ${this.projects.length > 1 ? `
-                                        <button class="project-action-btn delete-project-btn" onclick="todoApp.deleteProject('${project.id}')" title="Xóa project">
+                                        <button class="project-action-btn delete-project-btn" onclick="todoApp.handleAsyncCall(todoApp.deleteProject, '${project.id}')" title="Xóa project">
                                             <i class="fas fa-trash"></i>
                                         </button>
                                     ` : ''}
@@ -1778,7 +1956,7 @@ class TodoApp {
         } else {
             return `
                  <div class="todo-checkbox ${todo.completed ? 'completed' : ''} ${this.isLeafNode(todo.id) ? 'leaf-node' : ''} ${this.areAllChildrenCompleted(todo.id) ? 'all-children-completed' : ''}" 
-                      onclick="event.stopPropagation(); todoApp.toggleTodo('${todo.id}')">
+                      onclick="event.stopPropagation(); todoApp.handleAsyncCall(todoApp.toggleTodo, '${todo.id}')">
                      ${todo.completed ? (todo.timeBlocks > 1 ? (todo.timeBlocks === 10 ? '10' : todo.timeBlocks === 20 ? '20' : todo.timeBlocks === 30 ? '30' : todo.timeBlocks === 60 ? '1h' : todo.timeBlocks === 120 ? '2h' : todo.timeBlocks) : '<i class="fas fa-check"></i>') : ''}
                  </div>
             `;
@@ -1942,7 +2120,7 @@ class TodoApp {
         return div.innerHTML;
     }
 
-    saveTodos() {
+    async saveTodos() {
         try {
             // Thêm timestamp cho mỗi todo khi save
             const todosWithTimestamp = this.todos.map(todo => ({
@@ -1955,7 +2133,7 @@ class TodoApp {
             
             // Đồng bộ với Firebase nếu đã đăng nhập
             if (this.isAuthenticated) {
-                this.saveUserData();
+                await this.saveUserData();
             }
         } catch (error) {
             console.error('Error saving todos:', error);
@@ -2037,6 +2215,8 @@ class TodoApp {
                 
                     console.log('Firebase initialized successfully, setting up auth listeners');
                     this.setupAuthListeners();
+                    // Kiểm tra auth state ngay sau khi Firebase sẵn sàng
+                    this.checkAuthState();
             } else if (attempts < maxAttempts) {
                 setTimeout(checkFirebase, 100);
             } else {
@@ -2063,16 +2243,9 @@ class TodoApp {
             this.showMainApp();
             this.loadUserData();
         } else {
-            // Kiểm tra xem có dữ liệu local không trước khi hiển thị màn đăng nhập
-            const hasLocalData = this.hasLocalData();
-            if (hasLocalData) {
-                // Có dữ liệu local, hiển thị app ngay và load dữ liệu local
-                this.showMainApp();
-                this.loadLocalData();
-            } else {
-                // Không có dữ liệu local, hiển thị màn đăng nhập
+            // Khi không đăng nhập, luôn hiển thị màn đăng nhập
+            // Dữ liệu local vẫn được giữ lại để sử dụng khi đăng nhập lại
             this.showLoginScreen();
-            }
         }
     }
 
@@ -2115,11 +2288,13 @@ class TodoApp {
             // Import signOut
             const { signOut } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
             await signOut(this.firebaseAuth);
-            this.user = null;
-            this.isAuthenticated = false;
+            // Không cần set thủ công user và isAuthenticated
+            // Firebase sẽ tự động trigger onAuthStateChanged
             console.log('Đăng xuất thành công');
+            this.showMessage('Đã đăng xuất thành công', 'success');
         } catch (error) {
             console.error('Lỗi đăng xuất:', error);
+            this.showMessage('Có lỗi xảy ra khi đăng xuất: ' + error.message, 'error');
         }
     }
 
@@ -2184,16 +2359,26 @@ class TodoApp {
     async loadUserData() {
         if (!this.isAuthenticated || !this.user) return;
         
-        // Hiển thị dữ liệu local ngay lập tức
-        this.render();
-        this.updateStats();
-        console.log('Đã hiển thị dữ liệu local');
+        // Kiểm tra xem có dữ liệu local không
+        const hasLocalData = this.hasLocalData();
+        if (hasLocalData) {
+            // Hiển thị dữ liệu local ngay lập tức
+            this.render();
+            this.updateStats();
+            console.log('Đã hiển thị dữ liệu local');
+        }
         
         // Đồng bộ với Firebase ở background
         this.syncWithFirebaseInBackground();
     }
 
     async syncWithFirebaseInBackground() {
+        // Chỉ đồng bộ khi có user đăng nhập
+        if (!this.isAuthenticated || !this.user || !this.firebaseDB) {
+            console.log('Bỏ qua đồng bộ Firebase: không có user hoặc Firebase chưa sẵn sàng');
+            return;
+        }
+        
         try {
             // Import Firestore functions
             const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
@@ -2402,23 +2587,31 @@ class TodoApp {
             
             contextMenu.innerHTML = `
                 <div class="context-menu-time-blocks">
-                    <button class="context-time-btn" onclick="event.stopPropagation(); todoApp.setTimeBlocks('${todoId}', 2)" title="10 phút">10</button>
-                    <button class="context-time-btn" onclick="event.stopPropagation(); todoApp.setTimeBlocks('${todoId}', 4)" title="20 phút">20</button>
-                    <button class="context-time-btn" onclick="event.stopPropagation(); todoApp.setTimeBlocks('${todoId}', 6)" title="30 phút">30</button>
-                    <button class="context-time-btn" onclick="event.stopPropagation(); todoApp.setTimeBlocks('${todoId}', 12)" title="1 giờ">1h</button>
-                    <button class="context-time-btn" onclick="event.stopPropagation(); todoApp.setTimeBlocks('${todoId}', 24)" title="2 giờ">2h</button>
-                    <button class="context-skip-btn" onclick="event.stopPropagation(); todoApp.skipTodo('${todoId}')" title="Skip">
+                    <button class="context-time-btn" onclick="event.stopPropagation(); todoApp.handleAsyncCall(todoApp.setTimeBlocks, '${todoId}', 2)" title="10 phút">10</button>
+                    <button class="context-time-btn" onclick="event.stopPropagation(); todoApp.handleAsyncCall(todoApp.setTimeBlocks, '${todoId}', 4)" title="20 phút">20</button>
+                    <button class="context-time-btn" onclick="event.stopPropagation(); todoApp.handleAsyncCall(todoApp.setTimeBlocks, '${todoId}', 6)" title="30 phút">30</button>
+                    <button class="context-time-btn" onclick="event.stopPropagation(); todoApp.handleAsyncCall(todoApp.setTimeBlocks, '${todoId}', 12)" title="1 giờ">1h</button>
+                    <button class="context-time-btn" onclick="event.stopPropagation(); todoApp.handleAsyncCall(todoApp.setTimeBlocks, '${todoId}', 24)" title="2 giờ">2h</button>
+                    <button class="context-skip-btn" onclick="event.stopPropagation(); todoApp.handleAsyncCall(todoApp.skipTodo, '${todoId}')" title="Skip">
                         <i class="fas fa-forward"></i>
                     </button>
                 </div>
                 <div class="context-menu-divider"></div>
-                <div class="context-menu-item" onclick="todoApp.editTodo('${todoId}')">
+                <div class="context-menu-item" onclick="todoApp.handleAsyncCall(todoApp.editTodo, '${todoId}')">
                     <i class="fas fa-edit"></i>
                     Chỉnh sửa
                 </div>
-                <div class="context-menu-item" onclick="todoApp.addSubTodo('${todoId}')">
+                <div class="context-menu-item" onclick="todoApp.handleAsyncCall(todoApp.addSiblingTodoBefore, '${todoId}')">
+                    <i class="fas fa-arrow-up"></i>
+                    Thêm bước trước
+                </div>
+                <div class="context-menu-item" onclick="todoApp.handleAsyncCall(todoApp.addSubTodo, '${todoId}')">
                     <i class="fas fa-plus"></i>
-                    Thêm sub
+                    Thêm bước con
+                </div>
+                <div class="context-menu-item" onclick="todoApp.handleAsyncCall(todoApp.addSiblingTodoAfter, '${todoId}')">
+                    <i class="fas fa-arrow-down"></i>
+                    Thêm bước sau
                 </div>
                 <div class="context-menu-item" onclick="todoApp.startParentSelection('${todoId}')">
                     <i class="fas fa-level-up-alt"></i>
@@ -2428,16 +2621,16 @@ class TodoApp {
                     <i class="fas fa-exclamation"></i>
                     Ưu tiên
                 </div>
-                <div class="context-menu-item" onclick="todoApp.duplicateTodo('${todoId}')">
+                <div class="context-menu-item" onclick="todoApp.handleAsyncCall(todoApp.duplicateTodo, '${todoId}')">
                     <i class="fas fa-copy"></i>
                     Nhân bản
                 </div>
-                <div class="context-menu-item ${todo.parentId === null ? 'disabled' : ''}" onclick="${todo.parentId === null ? '' : `todoApp.makeRoot('${todoId}')`}">
+                <div class="context-menu-item ${todo.parentId === null ? 'disabled' : ''}" onclick="${todo.parentId === null ? '' : `todoApp.handleAsyncCall(todoApp.makeRoot, '${todoId}')`}">
                     <i class="fas fa-home"></i>
                     Làm root
                 </div>
                 <div class="context-menu-divider"></div>
-                <div class="context-menu-item" onclick="todoApp.deleteTodo('${todoId}')">
+                <div class="context-menu-item" onclick="todoApp.handleAsyncCall(todoApp.deleteTodo, '${todoId}')">
                     <i class="fas fa-trash"></i>
                     Xóa
                 </div>
@@ -2531,7 +2724,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ];
             
             window.todoApp.todos = sampleTodos;
-            window.todoApp.saveTodos();
+            window.todoApp.saveTodos(); // Không await vì đây là sample data
             window.todoApp.render();
             window.todoApp.updateStats();
         }
