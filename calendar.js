@@ -2,18 +2,38 @@
 class CalendarApp {
     constructor() {
         this.currentDate = new Date();
-        this.currentView = 'month'; // 'month' or 'week'
+        this.currentView = 'week'; // 'month' or 'week' - mặc định là week
         this.weekMode = '624'; // 'normal', '85', '624' - mặc định là 624
         this.selectedProjectId = 'all'; // Filter project
+        this.selectedStatusFilter = 'pending'; // Filter status: 'pending', 'completed', 'all' - mặc định là pending
         this.todos = this.loadTodos();
         this.projects = this.loadProjects();
         this.init();
     }
 
     init() {
+        // Refresh data from localStorage to ensure latest data
+        this.todos = this.loadTodos();
+        this.projects = this.loadProjects();
+        
         this.populateProjectFilter();
         this.renderCalendar();
         this.updateDisplay();
+        
+        // Set initial button states
+        this.updateButtonStates();
+    }
+
+    updateButtonStates() {
+        // Update view button states
+        document.getElementById('monthViewBtn').classList.toggle('active', this.currentView === 'month');
+        document.getElementById('weekViewBtn').classList.toggle('active', this.currentView === 'week');
+        
+        // Update status filter display
+        this.updateStatusFilterDisplay();
+        
+        // Update week dropdown state
+        this.updateWeekDropdownState();
     }
 
     loadTodos() {
@@ -55,12 +75,15 @@ class CalendarApp {
         // Lấy ngày đầu tuần (Chủ nhật)
         const startOfWeek = this.getStartOfWeek(this.currentDate);
         
+        // Tính toán chiều cao tối đa cho mỗi giờ
+        const maxHeightsByHour = this.calculateMaxHeightsByHour(startOfWeek);
+        
         // Tạo layout 24 giờ
         calendarGrid.innerHTML = `
             <div class="week-24h-container">
                 <div class="time-column">
                     <div class="time-header">Giờ</div>
-                    ${this.generateTimeSlots()}
+                    ${this.generateTimeSlots(maxHeightsByHour)}
                 </div>
                 <div class="days-column">
                     ${this.generateDayColumns(startOfWeek)}
@@ -69,13 +92,20 @@ class CalendarApp {
         `;
     }
 
-    generateTimeSlots() {
+    generateTimeSlots(maxHeightsByHour = null) {
         let timeSlots = '';
         const { startHour, endHour } = this.getHourRange();
         
         for (let hour = startHour; hour <= endHour; hour++) {
             const timeLabel = hour.toString().padStart(2, '0') + ':00';
-            timeSlots += `<div class="time-slot">${timeLabel}</div>`;
+            
+            // Sử dụng chiều cao tối đa đã tính toán hoặc chiều cao mặc định
+            let height = '40px'; // Chiều cao mặc định
+            if (maxHeightsByHour && maxHeightsByHour[hour] !== undefined) {
+                height = `${maxHeightsByHour[hour]}px`;
+            }
+            
+            timeSlots += `<div class="time-slot" style="min-height: ${height};">${timeLabel}</div>`;
         }
         return timeSlots;
     }
@@ -95,12 +125,24 @@ class CalendarApp {
         let dayColumns = '';
         const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
         
-        for (let i = 0; i < 7; i++) {
+        // Tính toán chiều cao tối đa cho mỗi giờ
+        const maxHeightsByHour = this.calculateMaxHeightsByHour(startOfWeek);
+        
+        // Xác định số ngày cần hiển thị dựa trên chế độ tuần
+        let daysToShow = 7; // Mặc định hiển thị 7 ngày
+        let startIndex = 0; // Bắt đầu từ ngày đầu tiên
+        
+        if (this.weekMode === '85') {
+            daysToShow = 5; // Chỉ hiển thị 5 ngày làm việc (T2-T6)
+            startIndex = 1; // Bắt đầu từ thứ 2 (index 1)
+        }
+        
+        for (let i = startIndex; i < startIndex + daysToShow; i++) {
             const date = new Date(startOfWeek);
             date.setDate(startOfWeek.getDate() + i);
             
             const dayTodos = this.getTodosForDate(date);
-            const hourSlots = this.generateHourSlots(date, dayTodos);
+            const hourSlots = this.generateHourSlots(date, dayTodos, maxHeightsByHour);
             
             dayColumns += `
                 <div class="day-column">
@@ -117,7 +159,50 @@ class CalendarApp {
         return dayColumns;
     }
 
-    generateHourSlots(date, dayTodos) {
+    calculateMaxHeightsByHour(startOfWeek) {
+        const { startHour, endHour } = this.getHourRange();
+        const maxHeightsByHour = {};
+        
+        // Khởi tạo chiều cao tối đa cho mỗi giờ
+        for (let hour = startHour; hour <= endHour; hour++) {
+            maxHeightsByHour[hour] = 0;
+        }
+        
+        // Xác định số ngày cần tính toán dựa trên chế độ tuần
+        let daysToCalculate = 7; // Mặc định tính toán 7 ngày
+        let startIndex = 0; // Bắt đầu từ ngày đầu tiên
+        
+        if (this.weekMode === '85') {
+            daysToCalculate = 5; // Chỉ tính toán 5 ngày làm việc (T2-T6)
+            startIndex = 1; // Bắt đầu từ thứ 2 (index 1)
+        }
+        
+        // Tính toán số lượng todos tối đa cho mỗi giờ
+        for (let i = startIndex; i < startIndex + daysToCalculate; i++) {
+            const date = new Date(startOfWeek);
+            date.setDate(startOfWeek.getDate() + i);
+            const dayTodos = this.getTodosForDate(date);
+            
+            for (let hour = startHour; hour <= endHour; hour++) {
+                const { todoCount } = this.getTodosForHour(dayTodos, hour, false, 0);
+                maxHeightsByHour[hour] = Math.max(maxHeightsByHour[hour], todoCount);
+            }
+        }
+        
+        // Chuyển đổi số lượng todos thành chiều cao
+        const baseHeight = 40;
+        const todoHeight = 20;
+        const minHeight = 40;
+        
+        for (let hour = startHour; hour <= endHour; hour++) {
+            const todoCount = maxHeightsByHour[hour];
+            maxHeightsByHour[hour] = Math.max(minHeight, baseHeight + (todoCount * todoHeight));
+        }
+        
+        return maxHeightsByHour;
+    }
+
+    generateHourSlots(date, dayTodos, maxHeightsByHour = null) {
         let hourSlots = '';
         const now = new Date();
         const currentHour = now.getHours();
@@ -146,11 +231,23 @@ class CalendarApp {
             hourClass += this.getHighlightClass(hour);
             
             // Lấy todos cho giờ này
-            const hourTodos = this.getTodosForHour(dayTodos, hour, isToday, currentHour);
+            const { todosHtml, todoCount } = this.getTodosForHour(dayTodos, hour, isToday, currentHour);
+            
+            // Sử dụng chiều cao tối đa đã tính toán hoặc tính toán động nếu không có
+            let dynamicHeight;
+            if (maxHeightsByHour && maxHeightsByHour[hour] !== undefined) {
+                dynamicHeight = maxHeightsByHour[hour];
+            } else {
+                // Fallback: tính toán chiều cao động dựa trên số lượng todos
+                const baseHeight = 40;
+                const todoHeight = 20;
+                const minHeight = 40;
+                dynamicHeight = Math.max(minHeight, baseHeight + (todoCount * todoHeight));
+            }
             
             hourSlots += `
-                <div class="${hourClass}" data-hour="${hour}">
-                    ${hourTodos}
+                <div class="${hourClass}" data-hour="${hour}" style="min-height: ${dynamicHeight}px;">
+                    ${todosHtml}
                 </div>
             `;
         }
@@ -190,45 +287,87 @@ class CalendarApp {
         let todosHtml = '';
         let todoIndex = 0;
         
-        dayTodos.forEach(todo => {
+        // Lọc todos hiển thị trong giờ này
+        const todosInHour = dayTodos.filter(todo => {
             // Bỏ qua todo Skipped
             if (todo.skipped === true) {
-                return;
+                return false;
             }
             
             // Filter theo project
             if (this.selectedProjectId !== 'all' && String(todo.projectId) !== String(this.selectedProjectId)) {
-                return;
+                return false;
+            }
+            
+            // Filter theo status
+            if (this.selectedStatusFilter !== 'all') {
+                if (this.selectedStatusFilter === 'pending' && todo.completed) {
+                    return false;
+                }
+                if (this.selectedStatusFilter === 'completed' && !todo.completed) {
+                    return false;
+                }
+            }
+            
+            // Chỉ hiển thị 2 level: root (level 1) và todo con (level 2)
+            if (todo.level > 2) {
+                return false;
             }
             
             let shouldShowInHour = false;
             
             if (todo.completed) {
-                // Todo đã hoàn thành: hiển thị trong giờ được đánh dấu hoàn thành
+                // QUY TẮC: Todo đã hoàn thành - hiển thị ở khung giờ được check là hoàn thành
                 const completedDate = todo.completedAt ? new Date(todo.completedAt) : new Date(todo.createdAt);
                 const completedHour = completedDate.getHours();
                 shouldShowInHour = (hour === completedHour);
             } else {
-                // Todo chưa hoàn thành: hiển thị trong giờ được tạo
+                // QUY TẮC: Todo chưa hoàn thành - hiển thị theo khung giờ created
                 const createdDate = new Date(todo.createdAt);
                 const createdHour = createdDate.getHours();
                 shouldShowInHour = (hour === createdHour);
             }
             
-            if (shouldShowInHour) {
-                const topOffset = todoIndex * 20; // Offset để không chồng lên nhau
-                todosHtml += `
-                    <div class="todo-item-24h ${todo.completed ? 'completed' : 'pending'} level-${todo.level}"
-                         style="top: ${topOffset}px; height: 18px;"
-                         title="${todo.text}">
-                        ${this.truncateText(todo.text, 15)}
-                    </div>
-                `;
-                todoIndex++;
-            }
+            return shouldShowInHour;
         });
         
-        return todosHtml;
+        // Sắp xếp todos theo thứ tự ưu tiên (đồng nhất với màn chính)
+        todosInHour.sort((a, b) => {
+            // 1. Sắp xếp theo level (cha trước con)
+            if (a.level !== b.level) {
+                return a.level - b.level;
+            }
+            
+            // 2. Sắp xếp theo parentId (cùng level, cùng parent)
+            if (a.parentId !== b.parentId) {
+                if (!a.parentId && b.parentId) return -1; // a là root, b là con
+                if (a.parentId && !b.parentId) return 1;  // a là con, b là root
+                return (a.parentId || '').localeCompare(b.parentId || '');
+            }
+            
+            // 3. Sắp xếp theo order (thứ tự trong cùng parent)
+            if (a.order !== undefined && b.order !== undefined) {
+                return a.order - b.order;
+            }
+            
+            // 4. Fallback: sắp xếp theo thời gian tạo
+            return new Date(a.createdAt) - new Date(b.createdAt);
+        });
+        
+        // Render todos đã sắp xếp
+        todosInHour.forEach(todo => {
+            const topOffset = todoIndex * 20; // Offset để không chồng lên nhau
+            todosHtml += `
+                <div class="todo-item-24h ${todo.completed ? 'completed' : 'pending'} level-${todo.level}"
+                     style="top: ${topOffset}px; height: 18px;"
+                     title="${todo.text}">
+                    ${this.truncateText(todo.text, 15)}
+                </div>
+            `;
+            todoIndex++;
+        });
+        
+        return { todosHtml, todoCount: todoIndex };
     }
 
     renderMonthView(calendarGrid) {
@@ -376,6 +515,21 @@ class CalendarApp {
             
             // Filter theo project
             if (this.selectedProjectId !== 'all' && String(todo.projectId) !== String(this.selectedProjectId)) {
+                return false;
+            }
+            
+            // Filter theo status
+            if (this.selectedStatusFilter !== 'all') {
+                if (this.selectedStatusFilter === 'pending' && todo.completed) {
+                    return false;
+                }
+                if (this.selectedStatusFilter === 'completed' && !todo.completed) {
+                    return false;
+                }
+            }
+            
+            // Chỉ hiển thị 2 level: root (level 1) và todo con (level 2)
+            if (todo.level > 2) {
                 return false;
             }
             
@@ -635,7 +789,61 @@ class CalendarApp {
         this.renderCalendar();
     }
 
+    toggleStatusFilter() {
+        // Xoay vòng theo thứ tự: pending → completed → all
+        const statusOrder = ['pending', 'completed', 'all'];
+        const currentIndex = statusOrder.indexOf(this.selectedStatusFilter);
+        const nextIndex = (currentIndex + 1) % statusOrder.length;
+        
+        this.selectedStatusFilter = statusOrder[nextIndex];
+        console.log('Status filter changed to:', this.selectedStatusFilter);
+        
+        // Update button display
+        this.updateStatusFilterDisplay();
+        
+        this.renderCalendar();
+    }
+
+    updateStatusFilterDisplay() {
+        const statusFilterBtn = document.getElementById('statusFilterBtn');
+        const statusFilterColor = document.getElementById('statusFilterColor');
+        const statusFilterText = document.getElementById('statusFilterText');
+        
+        if (!statusFilterBtn || !statusFilterColor || !statusFilterText) return;
+        
+        switch (this.selectedStatusFilter) {
+            case 'pending':
+                statusFilterColor.className = 'filter-color pending';
+                statusFilterText.textContent = 'Chưa hoàn thành';
+                break;
+            case 'completed':
+                statusFilterColor.className = 'filter-color completed';
+                statusFilterText.textContent = 'Đã hoàn thành';
+                break;
+            case 'all':
+                statusFilterColor.className = 'filter-color all';
+                statusFilterText.textContent = 'Tất cả';
+                break;
+        }
+    }
+
     goBack() {
+        // Lưu dữ liệu hiện tại trước khi quay lại
+        try {
+            localStorage.setItem('todos', JSON.stringify(this.todos));
+            localStorage.setItem('projects', JSON.stringify(this.projects));
+            
+            // Đánh dấu có thay đổi trong session để index biết
+            const sessionData = {
+                lastSyncTime: Date.now(),
+                isDataStale: false,
+                pendingChanges: true
+            };
+            sessionStorage.setItem('todoSessionData', JSON.stringify(sessionData));
+        } catch (error) {
+            console.error('Error saving data before going back:', error);
+        }
+        
         // Quay lại trang chính
         try {
             // Thử quay lại trang trước đó trước

@@ -1,9 +1,9 @@
 // Todo List Application
 class TodoApp {
     constructor() {
-        this.projects = this.loadProjects();
-        this.currentProjectId = this.loadCurrentProject();
-        this.todos = this.loadTodos();
+        this.projects = [];
+        this.currentProjectId = null;
+        this.todos = [];
         this.currentFilter = 'pending'; // Mặc định hiển thị "Còn"
         this.searchQuery = '';
         this.draggedTodo = null;
@@ -22,7 +22,124 @@ class TodoApp {
         this.firebaseDB = null;
         this.googleProvider = null;
         
+        // Session Management
+        this.sessionData = {
+            lastSyncTime: null,
+            isDataStale: false,
+            pendingChanges: false
+        };
+        
+        // Load dữ liệu từ localStorage
+        this.loadLocalData();
+        
         this.init(); // Không await vì constructor không thể async
+    }
+
+    loadLocalData() {
+        try {
+            // Load projects từ localStorage
+            const savedProjects = localStorage.getItem('projects');
+            if (savedProjects) {
+                this.projects = JSON.parse(savedProjects);
+            }
+            
+            // Load todos từ localStorage
+            const savedTodos = localStorage.getItem('todos');
+            if (savedTodos) {
+                this.todos = JSON.parse(savedTodos);
+            }
+            
+            // Load currentProjectId từ localStorage
+            const savedCurrentProjectId = localStorage.getItem('currentProjectId');
+            if (savedCurrentProjectId) {
+                this.currentProjectId = savedCurrentProjectId;
+            }
+            
+            // Load session data
+            this.loadSessionData();
+            
+            // Nếu không có project nào, tạo project mặc định
+            if (this.projects.length === 0) {
+                this.createDefaultData();
+            }
+            
+            // Nếu currentProjectId không hợp lệ, chọn project đầu tiên
+            if (!this.currentProjectId || !this.projects.find(p => p.id === this.currentProjectId)) {
+                this.currentProjectId = this.projects[0]?.id || null;
+            }
+            
+            console.log('Loaded local data:', {
+                projects: this.projects.length,
+                todos: this.todos.length,
+                currentProjectId: this.currentProjectId
+            });
+        } catch (error) {
+            console.error('Error loading local data:', error);
+            // Tạo dữ liệu mặc định nếu có lỗi
+            this.createDefaultData();
+        }
+    }
+
+    // Session Management Methods
+    loadSessionData() {
+        try {
+            const sessionData = sessionStorage.getItem('todoSessionData');
+            if (sessionData) {
+                this.sessionData = { ...this.sessionData, ...JSON.parse(sessionData) };
+            }
+        } catch (error) {
+            console.error('Error loading session data:', error);
+        }
+    }
+
+    saveSessionData() {
+        try {
+            sessionStorage.setItem('todoSessionData', JSON.stringify(this.sessionData));
+        } catch (error) {
+            console.error('Error saving session data:', error);
+        }
+    }
+
+    // Kiểm tra xem có cần sync Firebase không
+    shouldSyncFirebase() {
+        if (!this.isAuthenticated) return false;
+        
+        // Nếu chưa sync lần nào hoặc data đã stale
+        if (!this.sessionData.lastSyncTime || this.sessionData.isDataStale) {
+            return true;
+        }
+        
+        // Nếu có thay đổi chưa được sync
+        if (this.sessionData.pendingChanges) {
+            return true;
+        }
+        
+        // Kiểm tra thời gian sync (5 phút)
+        const now = Date.now();
+        const timeSinceLastSync = now - this.sessionData.lastSyncTime;
+        const SYNC_INTERVAL = 5 * 60 * 1000; // 5 phút
+        
+        return timeSinceLastSync > SYNC_INTERVAL;
+    }
+
+    // Đánh dấu data đã được sync
+    markDataSynced() {
+        this.sessionData.lastSyncTime = Date.now();
+        this.sessionData.isDataStale = false;
+        this.sessionData.pendingChanges = false;
+        this.saveSessionData();
+    }
+
+    // Đánh dấu có thay đổi cần sync
+    markDataChanged() {
+        this.sessionData.pendingChanges = true;
+        this.saveSessionData();
+    }
+
+    // Đánh dấu data đã stale (cần sync)
+    markDataStale() {
+        this.sessionData.isDataStale = true;
+        this.saveSessionData();
     }
 
     init() {
@@ -81,6 +198,13 @@ class TodoApp {
             });
         }
         
+        const resetFirebaseBtn = document.getElementById('resetFirebaseBtn');
+        if (resetFirebaseBtn) {
+            resetFirebaseBtn.addEventListener('click', () => {
+                this.resetFirebaseData();
+            });
+        }
+        
         if (createProjectBtn) {
             createProjectBtn.addEventListener('click', () => {
                 this.createProject();
@@ -117,7 +241,7 @@ class TodoApp {
                 this.setFilter(e.target.dataset.filter);
             });
         });
-        
+
         // Collapse All button
         const collapseAllBtn = document.getElementById('collapseAllBtn');
         if (collapseAllBtn) {
@@ -1024,9 +1148,9 @@ class TodoApp {
             this.showMessage('Đã xóa project!', 'success');
             
             // Sync Firebase ở background
+            this.saveTodos();
             this.saveProjects();
             this.saveCurrentProject();
-            this.saveTodos();
         }
     }
 
@@ -1075,6 +1199,7 @@ class TodoApp {
             
             // Sync Firebase ở background
             this.saveProjects();
+            this.saveTodos();
         }
     }
 
@@ -1172,6 +1297,7 @@ class TodoApp {
         
         // Sync Firebase ở background
         this.saveProjects();
+        this.saveTodos();
     }
 
     deleteArchivedProject(projectId) {
@@ -1193,7 +1319,6 @@ class TodoApp {
                 } else {
                     this.currentProjectId = null;
                 }
-                this.saveCurrentProject();
             }
             
             // Cập nhật UI ngay lập tức
@@ -1203,6 +1328,7 @@ class TodoApp {
             // Sync Firebase ở background
             this.saveTodos();
             this.saveProjects();
+            this.saveCurrentProject();
         }
     }
 
@@ -1327,30 +1453,6 @@ class TodoApp {
         return colors[Math.floor(Math.random() * colors.length)];
     }
 
-    loadProjects() {
-        try {
-            const saved = localStorage.getItem('projects');
-            if (saved) {
-                return JSON.parse(saved);
-            } else {
-                // Create default project
-                return [{
-                    id: 'default',
-                    name: 'Project Mặc Định',
-                    createdAt: new Date().toISOString(),
-                    color: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                }];
-            }
-        } catch (error) {
-            console.error('Error loading projects:', error);
-            return [{
-                id: 'default',
-                name: 'Project Mặc Định',
-                createdAt: new Date().toISOString(),
-                color: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-            }];
-        }
-    }
 
     async saveProjects() {
         try {
@@ -1360,10 +1462,15 @@ class TodoApp {
                 lastUpdated: new Date().toISOString()
             }));
             
-            localStorage.setItem('projects', JSON.stringify(projectsWithTimestamp));
             this.projects = projectsWithTimestamp; // Cập nhật lại projects với timestamp
             
-            // Đồng bộ với Firebase nếu đã đăng nhập
+            // Lưu vào localStorage để Calendar có thể sử dụng
+            localStorage.setItem('projects', JSON.stringify(this.projects));
+            
+            // Đánh dấu có thay đổi cần sync
+            this.markDataChanged();
+            
+            // Lưu Firebase
             if (this.isAuthenticated) {
                 await this.saveUserData();
             }
@@ -1372,20 +1479,16 @@ class TodoApp {
         }
     }
 
-    loadCurrentProject() {
-        try {
-            const saved = localStorage.getItem('currentProjectId');
-            return saved || 'default';
-        } catch (error) {
-            console.error('Error loading current project:', error);
-            return 'default';
-        }
-    }
 
     async saveCurrentProject() {
         try {
+            // Lưu vào localStorage
             localStorage.setItem('currentProjectId', this.currentProjectId);
-            // Đồng bộ với Firebase nếu đã đăng nhập
+            
+            // Đánh dấu có thay đổi cần sync
+            this.markDataChanged();
+            
+            // Lưu Firebase
             if (this.isAuthenticated) {
                 await this.saveUserData();
             }
@@ -2128,10 +2231,15 @@ class TodoApp {
                 lastUpdated: new Date().toISOString()
             }));
             
-            localStorage.setItem('todos', JSON.stringify(todosWithTimestamp));
             this.todos = todosWithTimestamp; // Cập nhật lại todos với timestamp
             
-            // Đồng bộ với Firebase nếu đã đăng nhập
+            // Lưu vào localStorage để Calendar có thể sử dụng
+            localStorage.setItem('todos', JSON.stringify(this.todos));
+            
+            // Đánh dấu có thay đổi cần sync
+            this.markDataChanged();
+            
+            // Lưu Firebase
             if (this.isAuthenticated) {
                 await this.saveUserData();
             }
@@ -2141,59 +2249,16 @@ class TodoApp {
         }
     }
 
-    loadTodos() {
-        try {
-            const saved = localStorage.getItem('todos');
-            const todos = saved ? JSON.parse(saved) : [];
-            
-            // Migrate existing todos to default project if they don't have projectId
-            // and add timeBlocks field if missing
-            const migratedTodos = todos.map(todo => {
-                if (!todo.projectId) {
-                    todo.projectId = 'default';
-                }
-                if (!todo.timeBlocks) {
-                    todo.timeBlocks = 1; // Default 1 block
-                }
-                if (todo.skipped === undefined) {
-                    todo.skipped = false; // Default not skipped
-                }
-                if (todo.order === undefined) {
-                    todo.order = 0; // Default order
-                }
-                return todo;
-            });
-            
-            // Assign proper order for todos without order field
-            const needsOrderAssignment = migratedTodos.some(todo => {
-                const original = todos.find(t => t.id === todo.id);
-                return original?.order === undefined;
-            });
-            
-            if (needsOrderAssignment) {
-                console.log('Assigning order to todos...');
-                this.assignOrderToAllTodos(migratedTodos);
-                console.log('Order assigned:', migratedTodos.map(t => ({ text: t.text, order: t.order, parentId: t.parentId })));
-            }
-            
-            // Save migrated todos if there were changes
-            if (migratedTodos.some(todo => {
-                const original = todos.find(t => t.id === todo.id);
-                return !original?.projectId || !original?.timeBlocks || original?.skipped === undefined || original?.order === undefined;
-            })) {
-                this.todos = migratedTodos;
-                this.saveTodos();
-            }
-            
-            return migratedTodos;
-        } catch (error) {
-            console.error('Error loading todos:', error);
-            this.showMessage('Lỗi khi tải dữ liệu!', 'warning');
-            return [];
-        }
-    }
 
     goToCalendar() {
+        // Lưu dữ liệu hiện tại trước khi chuyển trang
+        this.saveTodos();
+        this.saveProjects();
+        this.saveCurrentProject();
+        
+        // Đánh dấu có thay đổi cần sync
+        this.markDataChanged();
+        
         // Chuyển đến trang Calendar
         window.location.href = 'calendar.html';
     }
@@ -2241,7 +2306,14 @@ class TodoApp {
     handleAuthStateChange() {
         if (this.isAuthenticated) {
             this.showMainApp();
-            this.loadUserData();
+            // Chỉ load từ Firebase nếu cần thiết
+            if (this.shouldSyncFirebase()) {
+                this.loadUserData();
+            } else {
+                // Sử dụng dữ liệu từ session/localStorage
+                this.renderTodos();
+                console.log('Sử dụng dữ liệu từ session, bỏ qua sync Firebase');
+            }
         } else {
             // Khi không đăng nhập, luôn hiển thị màn đăng nhập
             // Dữ liệu local vẫn được giữ lại để sử dụng khi đăng nhập lại
@@ -2288,6 +2360,10 @@ class TodoApp {
             // Import signOut
             const { signOut } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
             await signOut(this.firebaseAuth);
+            
+            // Xóa session data khi đăng xuất
+            sessionStorage.removeItem('todoSessionData');
+            
             // Không cần set thủ công user và isAuthenticated
             // Firebase sẽ tự động trigger onAuthStateChanged
             console.log('Đăng xuất thành công');
@@ -2303,20 +2379,6 @@ class TodoApp {
         document.getElementById('todoApp').style.display = 'none';
     }
 
-    hasLocalData() {
-        // Kiểm tra xem có dữ liệu trong localStorage không
-        const todos = localStorage.getItem('todos');
-        const projects = localStorage.getItem('projects');
-        return (todos && todos !== '[]') || (projects && projects !== '[]');
-    }
-
-    loadLocalData() {
-        // Load dữ liệu từ localStorage
-        this.todos = this.loadTodos();
-        this.projects = this.loadProjects();
-        this.render();
-        this.updateStats();
-    }
 
     showMainApp() {
         document.getElementById('loginScreen').style.display = 'none';
@@ -2359,27 +2421,19 @@ class TodoApp {
     async loadUserData() {
         if (!this.isAuthenticated || !this.user) return;
         
-        // Kiểm tra xem có dữ liệu local không
-        const hasLocalData = this.hasLocalData();
-        if (hasLocalData) {
-            // Hiển thị dữ liệu local ngay lập tức
-            this.render();
-            this.updateStats();
-            console.log('Đã hiển thị dữ liệu local');
-        }
+        // Chỉ load từ Firebase
+        await this.loadFromFirebase();
         
-        // Đồng bộ với Firebase ở background
-        this.syncWithFirebaseInBackground();
+        // Đánh dấu data đã được sync
+        this.markDataSynced();
     }
 
-    async syncWithFirebaseInBackground() {
-        // Chỉ đồng bộ khi có user đăng nhập
-        if (!this.isAuthenticated || !this.user || !this.firebaseDB) {
-            console.log('Bỏ qua đồng bộ Firebase: không có user hoặc Firebase chưa sẵn sàng');
-            return;
-        }
+    async loadFromFirebase() {
+        if (!this.isAuthenticated || !this.user || !this.firebaseDB) return;
         
         try {
+            this.showMessage('Đang tải dữ liệu...', 'info');
+            
             // Import Firestore functions
             const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
             const userDocRef = doc(this.firebaseDB, 'users', this.user.uid);
@@ -2387,104 +2441,53 @@ class TodoApp {
             
             if (userDoc.exists()) {
                 const userData = userDoc.data();
-                const firebaseProjects = userData.projects || [];
-                const firebaseTodos = userData.todos || [];
-                const firebaseCurrentProjectId = userData.currentProjectId || null;
+                this.projects = userData.projects || [];
+                this.todos = userData.todos || [];
+                this.currentProjectId = userData.currentProjectId || null;
                 
-                // So sánh và merge dữ liệu
-                const mergedData = this.mergeLocalAndFirebaseData(
-                    { projects: this.projects, todos: this.todos, currentProjectId: this.currentProjectId },
-                    { projects: firebaseProjects, todos: firebaseTodos, currentProjectId: firebaseCurrentProjectId }
-                );
+                // Đồng bộ với localStorage
+                localStorage.setItem('projects', JSON.stringify(this.projects));
+                localStorage.setItem('todos', JSON.stringify(this.todos));
+                localStorage.setItem('currentProjectId', this.currentProjectId);
                 
-                // Cập nhật dữ liệu nếu có thay đổi
-                if (this.hasDataChanged(mergedData)) {
-                    this.projects = mergedData.projects;
-                    this.todos = mergedData.todos;
-                    this.currentProjectId = mergedData.currentProjectId;
-                    
-                    // Lưu dữ liệu đã merge
-                    this.saveTodos();
-                    this.saveProjects();
-                    this.saveCurrentProject();
-                    
-                    // Render lại với dữ liệu mới
+                // Render dữ liệu
                 this.render();
                 this.updateStats();
-                    
-                    console.log('Đã đồng bộ và merge dữ liệu từ Firebase');
-                    this.showMessage('Đã đồng bộ dữ liệu từ Firebase', 'success');
+                this.showMessage('Đã tải dữ liệu thành công!', 'success');
             } else {
-                    // Lưu dữ liệu local lên Firebase nếu không có thay đổi
+                // User mới - tạo dữ liệu mặc định
+                this.createDefaultData();
                 await this.saveUserData();
-                    console.log('Đã đồng bộ dữ liệu local lên Firebase');
-                }
-            } else {
-                // User mới - lưu dữ liệu local lên Firebase
-                await this.saveUserData();
-                console.log('Đã tạo user mới và lưu dữ liệu lên Firebase');
+                this.render();
+                this.updateStats();
+                this.showMessage('Đã tạo dữ liệu mặc định!', 'success');
             }
         } catch (error) {
-            console.error('Lỗi đồng bộ Firebase:', error);
-            this.showMessage('Lỗi đồng bộ dữ liệu với Firebase', 'warning');
+            console.error('Lỗi tải dữ liệu từ Firebase:', error);
+            this.showMessage('Lỗi tải dữ liệu từ Firebase!', 'error');
         }
     }
 
-    mergeLocalAndFirebaseData(localData, firebaseData) {
-        // Merge projects - ưu tiên dữ liệu mới hơn
-        const mergedProjects = [...localData.projects];
-        firebaseData.projects.forEach(firebaseProject => {
-            const localIndex = mergedProjects.findIndex(p => p.id === firebaseProject.id);
-            if (localIndex >= 0) {
-                // So sánh thời gian cập nhật
-                const localUpdated = new Date(localData.projects[localIndex].lastUpdated || localData.projects[localIndex].createdAt);
-                const firebaseUpdated = new Date(firebaseProject.lastUpdated || firebaseProject.createdAt);
-                
-                if (firebaseUpdated > localUpdated) {
-                    mergedProjects[localIndex] = firebaseProject;
-                }
-            } else {
-                // Project mới từ Firebase
-                mergedProjects.push(firebaseProject);
-            }
-        });
-
-        // Merge todos - ưu tiên dữ liệu mới hơn
-        const mergedTodos = [...localData.todos];
-        firebaseData.todos.forEach(firebaseTodo => {
-            const localIndex = mergedTodos.findIndex(t => t.id === firebaseTodo.id);
-            if (localIndex >= 0) {
-                // So sánh thời gian cập nhật
-                const localUpdated = new Date(localData.todos[localIndex].lastUpdated || localData.todos[localIndex].createdAt);
-                const firebaseUpdated = new Date(firebaseTodo.lastUpdated || firebaseTodo.createdAt);
-                
-                if (firebaseUpdated > localUpdated) {
-                    mergedTodos[localIndex] = firebaseTodo;
-                }
-            } else {
-                // Todo mới từ Firebase
-                mergedTodos.push(firebaseTodo);
-            }
-        });
-
-        // Merge currentProjectId - ưu tiên Firebase nếu có
-        const mergedCurrentProjectId = firebaseData.currentProjectId || localData.currentProjectId;
-
-        return {
-            projects: mergedProjects,
-            todos: mergedTodos,
-            currentProjectId: mergedCurrentProjectId
+    createDefaultData() {
+        // Tạo project mặc định
+        const defaultProject = {
+            id: this.generateId(),
+            name: 'Project mặc định',
+            createdAt: new Date().toISOString(),
+            color: this.getRandomProjectColor()
         };
+        
+        this.projects = [defaultProject];
+        this.currentProjectId = defaultProject.id;
+        this.todos = [];
+        
+        // Lưu vào localStorage
+        localStorage.setItem('projects', JSON.stringify(this.projects));
+        localStorage.setItem('todos', JSON.stringify(this.todos));
+        localStorage.setItem('currentProjectId', this.currentProjectId);
     }
 
-    hasDataChanged(mergedData) {
-        // Kiểm tra xem có thay đổi gì không
-        const projectsChanged = JSON.stringify(this.projects) !== JSON.stringify(mergedData.projects);
-        const todosChanged = JSON.stringify(this.todos) !== JSON.stringify(mergedData.todos);
-        const currentProjectChanged = this.currentProjectId !== mergedData.currentProjectId;
-        
-        return projectsChanged || todosChanged || currentProjectChanged;
-    }
+
 
     async saveUserData() {
         if (!this.isAuthenticated || !this.user) return;
@@ -2529,24 +2532,61 @@ class TodoApp {
         this.showLoadingMessage('Đang đồng bộ dữ liệu...');
         
         try {
-            await this.saveUserData();
+            // Load lại từ Firebase
+            await this.loadFromFirebase();
+            
+            // Đánh dấu data đã được sync
+            this.markDataSynced();
+            
             this.hideLoadingMessage();
-            this.render();
-            this.updateStats();
             this.showMessage('Đã đồng bộ dữ liệu thành công!', 'success');
             // Đóng menu sau khi đồng bộ thành công
             this.closeUserMenu();
         } catch (error) {
             console.error('Lỗi đồng bộ:', error);
             this.hideLoadingMessage();
-            this.render();
-            this.updateStats();
             this.showMessage('Lỗi đồng bộ dữ liệu', 'error');
         } finally {
             if (syncBtn) {
                 syncBtn.classList.remove('syncing');
                 syncBtn.disabled = false;
             }
+        }
+    }
+
+    async resetFirebaseData() {
+        if (!this.isAuthenticated || !this.user || !this.firebaseDB) {
+            this.showMessage('Vui lòng đăng nhập để reset Firebase!', 'warning');
+            return;
+        }
+
+        const confirmMessage = `Bạn có chắc muốn RESET Firebase?\n\n` +
+            `⚠️ Hành động này sẽ:\n` +
+            `• XÓA TẤT CẢ dữ liệu trên Firebase\n` +
+            `• Tạo dữ liệu mặc định mới\n` +
+            `• KHÔNG THỂ hoàn tác!\n\n` +
+            `Bạn có chắc chắn muốn tiếp tục?`;
+
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+
+        try {
+            this.showMessage('Đang reset Firebase...', 'info');
+            
+            // Xóa tất cả dữ liệu trên Firebase
+            await this.firebaseDB.collection('users').doc(this.user.uid).delete();
+            
+            // Tạo dữ liệu mặc định mới
+            this.createDefaultData();
+            await this.saveUserData();
+            
+            this.render();
+            this.updateStats();
+            this.showMessage('Reset Firebase thành công! Đã tạo dữ liệu mặc định mới.', 'success');
+        } catch (error) {
+            console.error('Reset Firebase error:', error);
+            this.showMessage('Lỗi khi reset Firebase!', 'error');
         }
     }
 
@@ -2730,3 +2770,4 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, 100);
 });
+

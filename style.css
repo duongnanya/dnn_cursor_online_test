@@ -202,6 +202,11 @@ body {
     background: #f5f5f5;
 }
 
+.menu-item:has(.fa-trash-restore):hover {
+    background: linear-gradient(135deg, rgba(255, 87, 34, 0.1), rgba(255, 87, 34, 0.05));
+    color: #FF5722;
+}
+
 .menu-item i {
     width: 16px;
     text-align: center;
@@ -1791,6 +1796,11 @@ body {
 .context-menu-item:has(.fa-home):hover {
     background: linear-gradient(135deg, rgba(255, 152, 0, 0.1), rgba(255, 152, 0, 0.05));
     color: #FF9800;
+}
+
+.context-menu-item:has(.fa-trash-restore):hover {
+    background: linear-gradient(135deg, rgba(255, 87, 34, 0.1), rgba(255, 87, 34, 0.05));
+    color: #FF5722;
 }
 
 .context-menu-item.disabled {

@@ -31,11 +31,8 @@
                         </select>
                     </div>
                     <div class="view-toggle">
-                        <button class="view-btn active" id="monthViewBtn" onclick="calendarApp.setView('month')">
-                            <i class="fas fa-calendar-alt"></i> Tháng
-                        </button>
                         <div class="week-dropdown">
-                            <button class="view-btn" id="weekViewBtn" onclick="calendarApp.toggleWeekDropdown()">
+                            <button class="view-btn active" id="weekViewBtn" onclick="calendarApp.toggleWeekDropdown()">
                                 <i class="fas fa-calendar-week"></i> <span id="weekModeText">Tuần 624</span>
                                 <i class="fas fa-chevron-down dropdown-arrow"></i>
                             </button>
@@ -54,6 +51,15 @@
                                 </div>
                             </div>
                         </div>
+                        <button class="view-btn" id="monthViewBtn" onclick="calendarApp.setView('month')">
+                            <i class="fas fa-calendar-alt"></i> Tháng
+                        </button>
+                    </div>
+                    <div class="status-filter">
+                        <button class="filter-btn active" id="statusFilterBtn" onclick="calendarApp.toggleStatusFilter()">
+                            <div class="filter-color" id="statusFilterColor"></div>
+                            <span id="statusFilterText">Chưa hoàn thành</span>
+                        </button>
                     </div>
                     <button class="today-btn" onclick="calendarApp.goToToday()">
                         <i class="fas fa-calendar-day"></i> Hôm nay
@@ -77,16 +83,6 @@
                 </div>
             </div>
             
-            <div class="calendar-legend">
-                <div class="legend-item">
-                    <div class="legend-color completed"></div>
-                    <span>Đã hoàn thành</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color pending"></div>
-                    <span>Chưa hoàn thành</span>
-                </div>
-            </div>
         </div>
     </div>
     
