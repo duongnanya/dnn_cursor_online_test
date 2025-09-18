@@ -65,6 +65,34 @@
     align-items: center;
 }
 
+.project-filter {
+    order: 1;
+}
+
+.project-filter select {
+    background: #f8f9fa;
+    border: 2px solid #e0e0e0;
+    color: #333;
+    padding: 8px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.9rem;
+    font-weight: 500;
+    min-width: 150px;
+}
+
+.project-filter select:hover {
+    border-color: #667eea;
+    background: #fff;
+}
+
+.project-filter select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
 .view-toggle {
     display: flex;
     gap: 2px;

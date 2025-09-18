@@ -25,6 +25,11 @@
                     </button>
                 </div>
                 <div class="calendar-actions">
+                    <div class="project-filter">
+                        <select id="projectFilter" onchange="calendarApp.setProjectFilter(this.value)">
+                            <option value="all">Tất cả dự án</option>
+                        </select>
+                    </div>
                     <div class="view-toggle">
                         <button class="view-btn active" id="monthViewBtn" onclick="calendarApp.setView('month')">
                             <i class="fas fa-calendar-alt"></i> Tháng
@@ -80,10 +85,6 @@
                 <div class="legend-item">
                     <div class="legend-color pending"></div>
                     <span>Chưa hoàn thành</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color today"></div>
-                    <span>Hôm nay</span>
                 </div>
             </div>
         </div>

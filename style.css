@@ -1834,3 +1834,252 @@ body {
     background: rgba(255, 152, 0, 0.2);
     transform: translateY(-1px);
 }
+
+/* Modal Base Styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    opacity: 0;
+    animation: modalFadeIn 0.3s ease forwards;
+}
+
+.modal-overlay.closing {
+    animation: modalFadeOut 0.3s ease forwards;
+}
+
+@keyframes modalFadeIn {
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes modalFadeOut {
+    to {
+        opacity: 0;
+    }
+}
+
+.modal-content {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    color: #333;
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow: hidden;
+    transform: scale(0.9) translateY(20px);
+    animation: modalSlideIn 0.3s ease forwards;
+}
+
+.modal-overlay.closing .modal-content {
+    animation: modalSlideOut 0.3s ease forwards;
+}
+
+@keyframes modalSlideIn {
+    to {
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes modalSlideOut {
+    to {
+        transform: scale(0.9) translateY(20px);
+    }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 16px 16px 0 0;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #495057;
+}
+
+.modal-close-btn {
+    background: none;
+    border: none;
+    color: #6c757d;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    opacity: 0.7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+}
+
+.modal-close-btn:hover {
+    background: rgba(0, 0, 0, 0.1);
+    opacity: 1;
+    transform: scale(1.1);
+    color: #495057;
+}
+
+.modal-close-btn i {
+    display: block;
+    line-height: 1;
+    transform-origin: center;
+}
+
+.modal-body {
+    padding: 24px;
+}
+
+/* Archived Projects Modal */
+.archived-projects-modal {
+    max-width: 600px;
+    max-height: 80vh;
+}
+
+.archived-projects-modal .modal-body {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.archived-projects-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Custom scrollbar for modal */
+.archived-projects-modal .modal-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.archived-projects-modal .modal-body::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+}
+
+.archived-projects-modal .modal-body::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+}
+
+.archived-projects-modal .modal-body::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.archived-project-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 12px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 576px) {
+    .archived-project-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+    
+    .archived-project-actions {
+        justify-content: stretch;
+    }
+}
+
+.archived-project-item:hover {
+    background: rgba(255, 255, 255, 1);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.archived-project-info h4 {
+    margin: 0 0 8px 0;
+    color: #495057;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.archived-project-stats {
+    margin: 0 0 4px 0;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.archived-date {
+    margin: 0;
+    color: #868e96;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.archived-project-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-restore, .btn-delete {
+    padding: 8px 12px;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-restore {
+    background: #28a745;
+    color: white;
+    border: 1px solid #28a745;
+}
+
+.btn-restore:hover {
+    background: #218838;
+    border-color: #1e7e34;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+}
+
+.btn-delete {
+    background: #dc3545;
+    color: white;
+    border: 1px solid #dc3545;
+}
+
+.btn-delete:hover {
+    background: #c82333;
+    border-color: #bd2130;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
+}

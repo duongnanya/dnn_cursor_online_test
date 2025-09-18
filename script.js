@@ -26,8 +26,13 @@ class TodoApp {
     }
 
     init() {
-        this.initFirebase();
         this.bindEvents();
+        this.initFirebase();
+        // Kiểm tra dữ liệu local trước khi check auth
+        if (this.hasLocalData()) {
+            this.showMainApp();
+            this.loadLocalData();
+        }
         this.checkAuthState();
     }
 
@@ -72,6 +77,13 @@ class TodoApp {
             });
         }
         
+        const archivedProjectsBtn = document.getElementById('archivedProjectsBtn');
+        if (archivedProjectsBtn) {
+            archivedProjectsBtn.addEventListener('click', () => {
+                this.showArchivedProjects();
+            });
+        }
+        
         if (createProjectBtn) {
             createProjectBtn.addEventListener('click', () => {
                 this.createProject();
@@ -108,6 +120,14 @@ class TodoApp {
                 this.setFilter(e.target.dataset.filter);
             });
         });
+        
+        // Collapse All button
+        const collapseAllBtn = document.getElementById('collapseAllBtn');
+        if (collapseAllBtn) {
+            collapseAllBtn.addEventListener('click', () => {
+                this.toggleCollapseAll();
+            });
+        }
 
 
 
@@ -201,7 +221,7 @@ class TodoApp {
             // Lưu thời gian xong khi đánh dấu xong
             if (todo.completed) {
                 todo.completedAt = new Date().toISOString();
-                // Khi click trực tiếp checkbox, luôn reset về 1 block
+                // Khi click trực tiếp checkbox, luôn reset về 1 phút
                 todo.timeBlocks = 1;
             } else {
                 // Xóa thời gian xong khi bỏ đánh dấu
@@ -222,15 +242,24 @@ class TodoApp {
     setTimeBlocks(id, blocks) {
         const todo = this.todos.find(t => t.id === id);
         if (todo) {
-            todo.timeBlocks = blocks;
+            // Convert blocks to minutes/hours for storage
+            let timeValue;
+            if (blocks === 2) timeValue = 10;      // 2 blocks -> 10 phút
+            else if (blocks === 4) timeValue = 20; // 4 blocks -> 20 phút
+            else if (blocks === 6) timeValue = 30; // 6 blocks -> 30 phút
+            else if (blocks === 12) timeValue = 60; // 12 blocks -> 1 giờ (60 phút)
+            else if (blocks === 24) timeValue = 120; // 24 blocks -> 2 giờ (120 phút)
+            else timeValue = blocks; // Fallback
+            
+            todo.timeBlocks = timeValue;
             todo.completed = true; // Tự động đánh dấu hoàn thành khi set time blocks
             todo.completedAt = new Date().toISOString();
             this.saveTodos();
             this.updateTodoItem(id);
             this.updateStats();
             
-            const message = `Đã hoàn thành trong ${blocks} block thời gian!`;
-            this.showMessage(message, 'success');
+            const displayText = timeValue === 60 ? '1h' : timeValue === 120 ? '2h' : `${timeValue} phút`;
+            this.showMessage(`Đã set ${displayText}!`, 'success');
         }
     }
 
@@ -609,6 +638,35 @@ class TodoApp {
         this.render(); // Render lại toàn bộ danh sách để ẩn/hiện children
     }
 
+    // Toggle collapse all todos (chỉ hiển thị todo cha)
+    toggleCollapseAll() {
+        const collapseAllBtn = document.getElementById('collapseAllBtn');
+        const icon = collapseAllBtn.querySelector('i');
+        const textSpan = collapseAllBtn.querySelector('span');
+        
+        // Kiểm tra xem có todo nào đang collapsed không
+        const hasCollapsedTodos = this.collapsedTodos.size > 0;
+        
+        if (hasCollapsedTodos) {
+            // Nếu có todo collapsed, mở rộng tất cả
+            this.collapsedTodos.clear();
+            icon.className = 'fas fa-compress-alt';
+            collapseAllBtn.title = 'Thu gọn tất cả';
+            textSpan.textContent = 'Thu gọn';
+        } else {
+            // Nếu không có todo nào collapsed, thu gọn tất cả todo có children
+            const todosWithChildren = this.todos.filter(todo => this.hasChildren(todo.id));
+            todosWithChildren.forEach(todo => {
+                this.collapsedTodos.add(todo.id);
+            });
+            icon.className = 'fas fa-expand-alt';
+            collapseAllBtn.title = 'Mở rộng tất cả';
+            textSpan.textContent = 'Mở rộng';
+        }
+        
+        this.render(); // Render lại để áp dụng thay đổi
+    }
+
     // Check if todo is collapsed
     isCollapsed(todoId) {
         return this.collapsedTodos.has(todoId);
@@ -866,6 +924,118 @@ class TodoApp {
         }
     }
 
+    showArchivedProjects() {
+        const archivedProjects = this.projects.filter(p => p.archived);
+        
+        if (archivedProjects.length === 0) {
+            this.showMessage('Không có project nào đã được lưu trữ.', 'info');
+            return;
+        }
+
+        // Tạo modal để hiển thị danh sách archived projects
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+            <div class="modal-content archived-projects-modal">
+                <div class="modal-header">
+                    <h3><i class="fas fa-archive"></i> Project đã lưu trữ</h3>
+                    <button class="modal-close-btn" onclick="todoApp.closeModal(this.closest('.modal-overlay'))">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="archived-projects-list">
+                        ${archivedProjects.map(project => {
+                            const projectTodos = this.todos.filter(t => t.projectId === project.id);
+                            const completedCount = projectTodos.filter(t => t.completed).length;
+                            const skippedCount = projectTodos.filter(t => t.skipped).length;
+                            const totalCount = projectTodos.length;
+                            const archivedDate = new Date(project.archivedAt).toLocaleDateString('vi-VN');
+                            
+                            return `
+                                <div class="archived-project-item">
+                                    <div class="archived-project-info">
+                                        <h4>${project.name}</h4>
+                                        <p class="archived-project-stats">
+                                            ${totalCount} công việc • ${completedCount} đã hoàn thành${skippedCount > 0 ? ` • ${skippedCount} bị skip` : ''}
+                                        </p>
+                                        <p class="archived-date">
+                                            <i class="fas fa-calendar"></i> Lưu trữ ngày: ${archivedDate}
+                                        </p>
+                                    </div>
+                                    <div class="archived-project-actions">
+                                        <button class="btn-restore" onclick="todoApp.restoreProject('${project.id}'); todoApp.closeModal(this.closest('.modal-overlay'));" title="Khôi phục project">
+                                            <i class="fas fa-undo"></i> Khôi phục
+                                        </button>
+                                        <button class="btn-delete" onclick="todoApp.deleteArchivedProject('${project.id}'); todoApp.closeModal(this.closest('.modal-overlay'));" title="Xóa vĩnh viễn">
+                                            <i class="fas fa-trash"></i> Xóa
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Đóng modal khi click outside
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                this.closeModal(modal);
+            }
+        });
+    }
+
+    closeModal(modal) {
+        modal.classList.add('closing');
+        setTimeout(() => {
+            modal.remove();
+        }, 300); // Match animation duration
+    }
+
+    restoreProject(projectId) {
+        const project = this.projects.find(p => p.id === projectId);
+        if (!project) return;
+
+        project.archived = false;
+        delete project.archivedAt;
+        this.saveProjects();
+        this.render();
+        this.showMessage(`Đã khôi phục project "${project.name}"!`, 'success');
+    }
+
+    deleteArchivedProject(projectId) {
+        const project = this.projects.find(p => p.id === projectId);
+        if (!project) return;
+
+        if (confirm(`Bạn có chắc muốn XÓA VĨNH VIỄN project "${project.name}" và tất cả công việc bên trong?\n\nHành động này không thể hoàn tác!`)) {
+            // Xóa tất cả todos thuộc project này
+            this.todos = this.todos.filter(t => t.projectId !== projectId);
+            
+            // Xóa project
+            this.projects = this.projects.filter(p => p.id !== projectId);
+            
+            // Nếu đang ở project bị xóa, chuyển sang project khác
+            if (this.currentProjectId === projectId) {
+                const remainingProjects = this.projects.filter(p => !p.archived);
+                if (remainingProjects.length > 0) {
+                    this.currentProjectId = remainingProjects[0].id;
+                } else {
+                    this.currentProjectId = null;
+                }
+                this.saveCurrentProject();
+            }
+            
+            this.saveTodos();
+            this.saveProjects();
+            this.render();
+            this.showMessage(`Đã xóa vĩnh viễn project "${project.name}"!`, 'success');
+        }
+    }
+
     switchProject(projectId) {
         this.currentProjectId = projectId;
         this.saveCurrentProject();
@@ -889,7 +1059,20 @@ class TodoApp {
         let matchingTodos = [];
         switch (this.currentFilter) {
             case 'pending':
-                matchingTodos = projectTodos.filter(t => !t.completed && !t.skipped);
+                // Hiển thị todo chưa hoàn thành + todo đã hoàn thành trong 24h gần nhất
+                const now = new Date();
+                const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                
+                matchingTodos = projectTodos.filter(t => {
+                    if (!t.completed && !t.skipped) {
+                        return true; // Todo chưa hoàn thành
+                    }
+                    if (t.completed && t.completedAt) {
+                        const completedDate = new Date(t.completedAt);
+                        return completedDate >= oneDayAgo; // Todo hoàn thành trong 24h gần nhất
+                    }
+                    return false;
+                });
                 break;
             default: // 'all'
                 matchingTodos = projectTodos; // Hiển thị tất cả (completed, pending, skipped)
@@ -1085,7 +1268,21 @@ class TodoApp {
     updateFilterButtons() {
         const allTodos = this.todos;
         const totalCount = allTodos.length;
-        const pendingCount = allTodos.filter(t => !t.completed).length;
+        
+        // Đếm pending: todo chưa hoàn thành + todo hoàn thành trong 24h gần nhất
+        const now = new Date();
+        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        const pendingCount = allTodos.filter(t => {
+            if (!t.completed && !t.skipped) {
+                return true; // Todo chưa hoàn thành
+            }
+            if (t.completed && t.completedAt) {
+                const completedDate = new Date(t.completedAt);
+                return completedDate >= oneDayAgo; // Todo hoàn thành trong 24h gần nhất
+            }
+            return false;
+        }).length;
+        
         const completedCount = allTodos.filter(t => t.completed).length;
         
         // Update filter button texts with counts
@@ -1218,7 +1415,20 @@ class TodoApp {
         let matchingTodos = [];
         switch (this.currentFilter) {
             case 'pending':
-                matchingTodos = projectTodos.filter(t => !t.completed && !t.skipped);
+                // Hiển thị todo chưa hoàn thành + todo đã hoàn thành trong 24h gần nhất
+                const now = new Date();
+                const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                
+                matchingTodos = projectTodos.filter(t => {
+                    if (!t.completed && !t.skipped) {
+                        return true; // Todo chưa hoàn thành
+                    }
+                    if (t.completed && t.completedAt) {
+                        const completedDate = new Date(t.completedAt);
+                        return completedDate >= oneDayAgo; // Todo hoàn thành trong 24h gần nhất
+                    }
+                    return false;
+                });
                 break;
             default: // 'all'
                 matchingTodos = projectTodos; // Hiển thị tất cả (completed, pending, skipped)
@@ -1569,7 +1779,7 @@ class TodoApp {
             return `
                  <div class="todo-checkbox ${todo.completed ? 'completed' : ''} ${this.isLeafNode(todo.id) ? 'leaf-node' : ''} ${this.areAllChildrenCompleted(todo.id) ? 'all-children-completed' : ''}" 
                       onclick="event.stopPropagation(); todoApp.toggleTodo('${todo.id}')">
-                     ${todo.completed ? (todo.timeBlocks > 1 ? todo.timeBlocks : '<i class="fas fa-check"></i>') : ''}
+                     ${todo.completed ? (todo.timeBlocks > 1 ? (todo.timeBlocks === 10 ? '10' : todo.timeBlocks === 20 ? '20' : todo.timeBlocks === 30 ? '30' : todo.timeBlocks === 60 ? '1h' : todo.timeBlocks === 120 ? '2h' : todo.timeBlocks) : '<i class="fas fa-check"></i>') : ''}
                  </div>
             `;
         }
@@ -1853,7 +2063,16 @@ class TodoApp {
             this.showMainApp();
             this.loadUserData();
         } else {
+            // Kiểm tra xem có dữ liệu local không trước khi hiển thị màn đăng nhập
+            const hasLocalData = this.hasLocalData();
+            if (hasLocalData) {
+                // Có dữ liệu local, hiển thị app ngay và load dữ liệu local
+                this.showMainApp();
+                this.loadLocalData();
+            } else {
+                // Không có dữ liệu local, hiển thị màn đăng nhập
             this.showLoginScreen();
+            }
         }
     }
 
@@ -1907,6 +2126,21 @@ class TodoApp {
     showLoginScreen() {
         document.getElementById('loginScreen').style.display = 'flex';
         document.getElementById('todoApp').style.display = 'none';
+    }
+
+    hasLocalData() {
+        // Kiểm tra xem có dữ liệu trong localStorage không
+        const todos = localStorage.getItem('todos');
+        const projects = localStorage.getItem('projects');
+        return (todos && todos !== '[]') || (projects && projects !== '[]');
+    }
+
+    loadLocalData() {
+        // Load dữ liệu từ localStorage
+        this.todos = this.loadTodos();
+        this.projects = this.loadProjects();
+        this.render();
+        this.updateStats();
     }
 
     showMainApp() {
@@ -1990,14 +2224,14 @@ class TodoApp {
                     this.saveCurrentProject();
                     
                     // Render lại với dữ liệu mới
-                    this.render();
-                    this.updateStats();
+                this.render();
+                this.updateStats();
                     
                     console.log('Đã đồng bộ và merge dữ liệu từ Firebase');
                     this.showMessage('Đã đồng bộ dữ liệu từ Firebase', 'success');
-                } else {
+            } else {
                     // Lưu dữ liệu local lên Firebase nếu không có thay đổi
-                    await this.saveUserData();
+                await this.saveUserData();
                     console.log('Đã đồng bộ dữ liệu local lên Firebase');
                 }
             } else {
@@ -2168,11 +2402,11 @@ class TodoApp {
             
             contextMenu.innerHTML = `
                 <div class="context-menu-time-blocks">
-                    <button class="context-time-btn" onclick="event.stopPropagation(); todoApp.setTimeBlocks('${todoId}', 2)" title="2 blocks (10 phút)">2</button>
-                    <button class="context-time-btn" onclick="event.stopPropagation(); todoApp.setTimeBlocks('${todoId}', 3)" title="3 blocks (15 phút)">3</button>
-                    <button class="context-time-btn" onclick="event.stopPropagation(); todoApp.setTimeBlocks('${todoId}', 4)" title="4 blocks (20 phút)">4</button>
-                    <button class="context-time-btn" onclick="event.stopPropagation(); todoApp.setTimeBlocks('${todoId}', 5)" title="5 blocks (25 phút)">5</button>
-                    <button class="context-time-btn" onclick="event.stopPropagation(); todoApp.setTimeBlocks('${todoId}', 6)" title="6 blocks (30 phút)">6</button>
+                    <button class="context-time-btn" onclick="event.stopPropagation(); todoApp.setTimeBlocks('${todoId}', 2)" title="10 phút">10</button>
+                    <button class="context-time-btn" onclick="event.stopPropagation(); todoApp.setTimeBlocks('${todoId}', 4)" title="20 phút">20</button>
+                    <button class="context-time-btn" onclick="event.stopPropagation(); todoApp.setTimeBlocks('${todoId}', 6)" title="30 phút">30</button>
+                    <button class="context-time-btn" onclick="event.stopPropagation(); todoApp.setTimeBlocks('${todoId}', 12)" title="1 giờ">1h</button>
+                    <button class="context-time-btn" onclick="event.stopPropagation(); todoApp.setTimeBlocks('${todoId}', 24)" title="2 giờ">2h</button>
                     <button class="context-skip-btn" onclick="event.stopPropagation(); todoApp.skipTodo('${todoId}')" title="Skip">
                         <i class="fas fa-forward"></i>
                     </button>

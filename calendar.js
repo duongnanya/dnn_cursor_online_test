@@ -4,12 +4,14 @@ class CalendarApp {
         this.currentDate = new Date();
         this.currentView = 'month'; // 'month' or 'week'
         this.weekMode = '624'; // 'normal', '85', '624' - mặc định là 624
+        this.selectedProjectId = 'all'; // Filter project
         this.todos = this.loadTodos();
         this.projects = this.loadProjects();
         this.init();
     }
 
     init() {
+        this.populateProjectFilter();
         this.renderCalendar();
         this.updateDisplay();
     }
@@ -189,6 +191,16 @@ class CalendarApp {
         let todoIndex = 0;
         
         dayTodos.forEach(todo => {
+            // Bỏ qua todo Skipped
+            if (todo.skipped === true) {
+                return;
+            }
+            
+            // Filter theo project
+            if (this.selectedProjectId !== 'all' && String(todo.projectId) !== String(this.selectedProjectId)) {
+                return;
+            }
+            
             let shouldShowInHour = false;
             
             if (todo.completed) {
@@ -357,6 +369,16 @@ class CalendarApp {
         const isFuture = date > today;
         
         return this.todos.filter(todo => {
+            // Bỏ qua todo Skipped và con của nó
+            if (todo.skipped === true) {
+                return false;
+            }
+            
+            // Filter theo project
+            if (this.selectedProjectId !== 'all' && String(todo.projectId) !== String(this.selectedProjectId)) {
+                return false;
+            }
+            
             // 1. Todo được tạo trong ngày này - luôn hiển thị
             const todoCreatedDateString = this.getLocalDateString(new Date(todo.createdAt));
             if (todoCreatedDateString === targetDateString) {
@@ -581,9 +603,52 @@ class CalendarApp {
         this.updateDisplay();
     }
 
+    populateProjectFilter() {
+        const projectFilter = document.getElementById('projectFilter');
+        if (!projectFilter) return;
+        
+        console.log('Projects loaded:', this.projects);
+        
+        // Clear existing options except "Tất cả dự án"
+        projectFilter.innerHTML = '<option value="all">Tất cả dự án</option>';
+        
+        // Add project options
+        this.projects.forEach(project => {
+            const option = document.createElement('option');
+            option.value = project.id;
+            option.textContent = project.name;
+            projectFilter.appendChild(option);
+        });
+    }
+
+    setProjectFilter(projectId) {
+        this.selectedProjectId = projectId;
+        console.log('Project filter changed to:', projectId);
+        
+        // Refresh data from localStorage
+        this.todos = this.loadTodos();
+        this.projects = this.loadProjects();
+        
+        console.log('Current todos:', this.todos);
+        console.log('Current projects:', this.projects);
+        
+        this.renderCalendar();
+    }
+
     goBack() {
         // Quay lại trang chính
-        window.location.href = 'index.html';
+        try {
+            // Thử quay lại trang trước đó trước
+            if (document.referrer && document.referrer.includes('index.html')) {
+                window.history.back();
+            } else {
+                // Nếu không có referrer, chuyển trực tiếp
+                window.location.replace('./index.html');
+            }
+        } catch (error) {
+            // Fallback: chuyển trực tiếp
+            window.location.replace('./index.html');
+        }
     }
 }
 
