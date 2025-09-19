@@ -217,11 +217,152 @@
     box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
 }
 
+.calendar-main {
+    display: flex;
+    gap: 20px;
+    flex: 1;
+    overflow: hidden; /* Ngăn overflow từ parent */
+    margin-right: 280px; /* Tạo không gian cho fixed sidebar */
+}
+
 .calendar-container {
     flex: 1;
     padding: 20px 30px;
     background: #f8f9fa;
-    overflow-y: scroll; /* Luôn hiển thị scrollbar */
+    overflow-y: auto; /* Cho phép scroll dọc */
+    /* max-height: calc(100vh - 200px); Giới hạn chiều cao để có scroll */
+}
+
+.calendar-sidebar {
+    width: 280px;
+    background: #f8f9fa;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 20px;
+    height: calc(100vh - 80px); /* Trừ đi chiều cao filter-section */
+    position: fixed;
+    right: 0;
+    top: 80px; /* Bắt đầu từ dưới filter-section */
+    overflow-y: auto;
+}
+
+.sidebar-section {
+    margin-bottom: 30px;
+}
+
+.sidebar-section h3 {
+    margin: 0 0 15px 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #333;
+    border-bottom: 2px solid #f0f0f0;
+    padding-bottom: 8px;
+}
+
+.project-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.project-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.project-item:hover {
+    background: #f8f9fa;
+}
+
+.project-item.checked {
+    border-color: #007bff;
+    background: rgba(0, 123, 255, 0.1);
+}
+
+.project-checkbox {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.project-name {
+    flex: 1;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.status-filter-group {
+    display: flex;
+    gap: 2px;
+    background: #f8f9fa;
+    border-radius: 20px;
+    padding: 2px;
+    border: 2px solid #e0e0e0;
+}
+
+.status-filter-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 18px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #666;
+    text-align: center;
+}
+
+.status-filter-btn:hover {
+    background: rgba(102, 126, 234, 0.1);
+    color: #667eea;
+}
+
+.status-filter-btn.active {
+    background: #667eea;
+    color: white;
+    box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+}
+
+.level-filter-group {
+    display: flex;
+    gap: 2px;
+    background: #f8f9fa;
+    border-radius: 20px;
+    padding: 2px;
+    border: 2px solid #e0e0e0;
+}
+
+.level-filter-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 18px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #666;
+    text-align: center;
+}
+
+.level-filter-btn:hover {
+    background: rgba(102, 126, 234, 0.1);
+    color: #667eea;
+}
+
+.level-filter-btn.active {
+    background: #667eea;
+    color: white;
+    box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
 }
 
 /* Custom scrollbar cho calendar-container */
@@ -258,6 +399,7 @@
     font-weight: 600;
     font-size: 0.9rem;
     border-right: 1px solid #e0e0e0;
+    border-bottom: 1px solid #e0e0e0;
     height: 40px;
     display: flex;
     align-items: center;
@@ -275,6 +417,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    border-bottom: 1px solid #e0e0e0;
+    border-right: 1px solid #e0e0e0;
 }
 
 .calendar-grid {
@@ -437,7 +581,6 @@
     position: absolute;
     left: 2px;
     right: 2px;
-    background: #fff3cd;
     border: 1px solid #ffc107;
     border-radius: 4px;
     padding: 4px 6px;
@@ -447,6 +590,8 @@
     transition: all 0.3s ease;
     z-index: 10;
     word-break: break-word;
+    display: flex;
+    align-items: center;
 }
 
 .todo-item-24h:hover {
@@ -456,14 +601,12 @@
 }
 
 .todo-item-24h.completed {
-    background: #d4edda;
     border-color: #28a745;
     text-decoration: line-through;
     opacity: 0.8;
 }
 
 .todo-item-24h.pending {
-    background: #fff3cd;
     border-color: #ffc107;
 }
 
@@ -650,6 +793,41 @@
 }
 
 /* Responsive Design */
+@media (max-width: 1024px) {
+    .calendar-main {
+        flex-direction: column;
+        overflow: visible; /* Cho phép overflow trên mobile */
+        margin-right: 0; /* Bỏ margin trên mobile */
+    }
+    
+    .calendar-container {
+        max-height: calc(100vh - 300px); /* Tăng chiều cao trên mobile */
+    }
+    
+    .calendar-sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+        margin-top: 20px;
+    }
+    
+    .project-list {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    
+    .project-item {
+        flex: 1;
+        min-width: 200px;
+    }
+    
+    .status-filter-group {
+        flex-direction: row;
+        gap: 0;
+    }
+}
+
 @media (max-width: 768px) {
     .calendar-container {
         padding: 15px;

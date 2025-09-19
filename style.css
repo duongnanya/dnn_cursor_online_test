@@ -513,20 +513,30 @@ body {
     background: white;
     border-radius: 25px;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all 0.2s ease; /* Giảm thời gian transition */
     font-size: 0.9rem;
     color: #666;
+    user-select: none; /* Ngăn select text khi click */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
 }
 
 .filter-btn:hover {
     border-color: #667eea;
     color: #667eea;
+    transform: translateY(-1px); /* Hiệu ứng nhẹ khi hover */
+}
+
+.filter-btn:active {
+    transform: translateY(0); /* Reset transform khi click */
 }
 
 .filter-btn.active {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     border-color: transparent;
+    transform: translateY(-1px); /* Giữ hiệu ứng cho active state */
 }
 
 
@@ -670,6 +680,7 @@ body {
     overflow-y: auto;
     padding: 0;
     min-height: 300px;
+    position: relative; /* Cần thiết để sticky hoạt động */
 }
 
 .empty-project {
@@ -713,8 +724,45 @@ body {
     position: relative;
 }
 
+/* Todo gốc (root todos) - không có parentId, level = 0 */
+.todo-item:not([class*="level-"]) {
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease; /* Smooth transition cho mọi thay đổi */
+    border-radius: 0; /* Đảm bảo không có border-radius khi sticky */
+    border-left: 4px solid #667eea; /* Màu border dày hơn cho todo gốc */
+    font-weight: 600; /* Todo gốc có font đậm hơn */
+}
+
+/* Enhance sticky effect khi scroll cho todo gốc */
+.todo-item:not([class*="level-"]).sticky-active {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    background: rgba(255, 255, 255, 0.98); /* Slight transparency để thấy content bên dưới */
+    backdrop-filter: blur(2px); /* Hiệu ứng blur nhẹ */
+}
+
+/* Đảm bảo Todo Root luôn có background solid khi không sticky */
+.todo-item:not([class*="level-"]):not(.sticky-active) {
+    background: white;
+}
+
+/* Todo gốc border effect - không dùng gradient */
+.todo-item:not([class*="level-"])::before {
+    content: '';
+    position: absolute;
+    left: -4px;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: #667eea; /* Màu solid cho todo gốc */
+}
+
 .todo-item.level-1 {
-    border-left-color: #667eea;
+    border-left-color: #4CAF50;
+    z-index: 5; /* Thấp hơn todo gốc để nằm dưới sticky header */
 }
 
 .todo-item.level-1::before {
@@ -724,11 +772,12 @@ body {
     top: 0;
     bottom: 0;
     width: 3px;
-    background: linear-gradient(to bottom, #667eea, rgba(102, 126, 234, 0.3));
+    background: #4CAF50; /* Màu solid cho level-1 */
 }
 
 .todo-item.level-2 {
-    border-left-color: #4CAF50;
+    border-left-color: #FF9800;
+    z-index: 4; /* Thấp hơn level-1 */
 }
 
 .todo-item.level-2::before {
@@ -738,11 +787,12 @@ body {
     top: 0;
     bottom: 0;
     width: 3px;
-    background: linear-gradient(to bottom, #4CAF50, rgba(76, 175, 80, 0.3));
+    background: #FF9800; /* Màu solid cho level-2 */
 }
 
 .todo-item.level-3 {
-    border-left-color: #FF9800;
+    border-left-color: #9C27B0;
+    z-index: 3; /* Thấp hơn level-2 */
 }
 
 .todo-item.level-3::before {
@@ -752,11 +802,12 @@ body {
     top: 0;
     bottom: 0;
     width: 3px;
-    background: linear-gradient(to bottom, #FF9800, rgba(255, 152, 0, 0.3));
+    background: #9C27B0; /* Màu solid cho level-3 */
 }
 
 .todo-item.level-4 {
-    border-left-color: #9C27B0;
+    border-left-color: #F44336;
+    z-index: 2; /* Thấp hơn level-3 */
 }
 
 .todo-item.level-4::before {
@@ -766,11 +817,12 @@ body {
     top: 0;
     bottom: 0;
     width: 3px;
-    background: linear-gradient(to bottom, #9C27B0, rgba(156, 39, 176, 0.3));
+    background: #F44336; /* Màu solid cho level-4 */
 }
 
 .todo-item.level-5 {
-    border-left-color: #F44336;
+    border-left-color: #00BCD4;
+    z-index: 1; /* Thấp hơn level-4 */
 }
 
 .todo-item.level-5::before {
@@ -780,11 +832,12 @@ body {
     top: 0;
     bottom: 0;
     width: 3px;
-    background: linear-gradient(to bottom, #F44336, rgba(244, 67, 54, 0.3));
+    background: #00BCD4; /* Màu solid cho level-5 */
 }
 
 .todo-item.level-6 {
-    border-left-color: #00BCD4;
+    border-left-color: #795548;
+    z-index: 1; /* Thấp hơn level-5 */
 }
 
 .todo-item.level-6::before {
@@ -794,18 +847,60 @@ body {
     top: 0;
     bottom: 0;
     width: 3px;
-    background: linear-gradient(to bottom, #00BCD4, rgba(0, 188, 212, 0.3));
+    background: #795548; /* Màu solid cho level-6 */
 }
 
 /* For deeper levels, use a cycling color pattern */
-.todo-item.level-7 { border-left-color: #795548; }
-.todo-item.level-8 { border-left-color: #607D8B; }
-.todo-item.level-9 { border-left-color: #E91E63; }
-.todo-item.level-10 { border-left-color: #3F51B5; }
+.todo-item.level-7 { 
+    border-left-color: #607D8B; 
+    z-index: 1; 
+}
 
-.todo-item.level-7::before,
-.todo-item.level-8::before,
-.todo-item.level-9::before,
+.todo-item.level-8 { 
+    border-left-color: #E91E63; 
+    z-index: 1; 
+}
+
+.todo-item.level-9 { 
+    border-left-color: #3F51B5; 
+    z-index: 1; 
+}
+
+.todo-item.level-10 { 
+    border-left-color: #FF5722; 
+    z-index: 1; 
+}
+
+.todo-item.level-7::before {
+    content: '';
+    position: absolute;
+    left: -3px;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: #607D8B;
+}
+
+.todo-item.level-8::before {
+    content: '';
+    position: absolute;
+    left: -3px;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: #E91E63;
+}
+
+.todo-item.level-9::before {
+    content: '';
+    position: absolute;
+    left: -3px;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: #3F51B5;
+}
+
 .todo-item.level-10::before {
     content: '';
     position: absolute;
@@ -813,13 +908,13 @@ body {
     top: 0;
     bottom: 0;
     width: 3px;
-    background: currentColor;
-    opacity: 0.6;
+    background: #FF5722;
 }
 
 /* For levels beyond 10, use a default style */
 .todo-item[class*="level-"]:not(.level-1):not(.level-2):not(.level-3):not(.level-4):not(.level-5):not(.level-6):not(.level-7):not(.level-8):not(.level-9):not(.level-10) {
     border-left-color: #999;
+    z-index: 1; /* Thấp hơn level-1 để nằm dưới sticky header */
 }
 
 .todo-item[class*="level-"]:not(.level-1):not(.level-2):not(.level-3):not(.level-4):not(.level-5):not(.level-6):not(.level-7):not(.level-8):not(.level-9):not(.level-10)::before {
@@ -829,8 +924,7 @@ body {
     top: 0;
     bottom: 0;
     width: 3px;
-    background: #999;
-    opacity: 0.4;
+    background: #999; /* Màu solid cho level > 10 */
 }
 
 .todo-item {

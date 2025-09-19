@@ -165,8 +165,8 @@ class TodoApp {
         
         // Click outside to close context menu
         document.addEventListener('click', (e) => {
-            // Không đóng context menu nếu click vào chính nó
-            if (!e.target.closest('.custom-context-menu')) {
+            // Không đóng context menu nếu click vào chính nó hoặc filter buttons
+            if (!e.target.closest('.custom-context-menu') && !e.target.closest('.filter-btn')) {
                 this.closeContextMenu();
             }
         });
@@ -220,16 +220,16 @@ class TodoApp {
         
         // Đóng menu khi click bên ngoài
         document.addEventListener('click', (e) => {
-            if (!e.target.closest('.user-avatar-container')) {
+            if (!e.target.closest('.user-avatar-container') && !e.target.closest('.filter-btn')) {
                 this.closeUserMenu();
             }
             
             // Cancel selection modes when clicking outside
-            if (this.parentSelectionMode && !e.target.closest('.todo-item')) {
+            if (this.parentSelectionMode && !e.target.closest('.todo-item') && !e.target.closest('.filter-btn')) {
                 this.cancelParentSelection();
             }
             
-            if (this.prioritySelectionMode && !e.target.closest('.todo-item')) {
+            if (this.prioritySelectionMode && !e.target.closest('.todo-item') && !e.target.closest('.filter-btn')) {
                 this.cancelPrioritySelection();
             }
         });
@@ -238,7 +238,14 @@ class TodoApp {
         const filterBtns = document.querySelectorAll('.filter-btn');
         filterBtns.forEach(btn => {
             btn.addEventListener('click', (e) => {
-                this.setFilter(e.target.dataset.filter);
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // Tìm button element (có thể click vào icon hoặc text)
+                const button = e.target.closest('.filter-btn');
+                if (button && button.dataset.filter) {
+                    this.setFilter(button.dataset.filter);
+                }
             });
         });
 
@@ -281,6 +288,9 @@ class TodoApp {
 
         // Double-click on multi-project-container to toggle planner mode
         const multiProjectContainer = document.getElementById('multiProjectContainer');
+        
+        // Initialize sticky behavior for Todo Root items
+        this.initStickyBehavior();
     }
 
     addTodo(parentId = null) {
@@ -1359,17 +1369,46 @@ class TodoApp {
         let matchingTodos = [];
         switch (this.currentFilter) {
             case 'pending':
-                // Hiển thị todo chưa hoàn thành + todo đã hoàn thành trong 24h gần nhất
-                const now = new Date();
-                const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                // Chỉ hiển thị todo chưa hoàn thành (bỏ todo đã xong trong 24h)
+                matchingTodos = projectTodos.filter(t => {
+                    return !t.completed && !t.skipped; // Chỉ todo chưa hoàn thành
+                });
+                break;
+            case '4h':
+                // Hiển thị todo đã hoàn thành trong 4h gần nhất
+                const now4h = new Date();
+                const fourHoursAgo = new Date(now4h.getTime() - 4 * 60 * 60 * 1000);
                 
                 matchingTodos = projectTodos.filter(t => {
-                    if (!t.completed && !t.skipped) {
-                        return true; // Todo chưa hoàn thành
-                    }
                     if (t.completed && t.completedAt) {
                         const completedDate = new Date(t.completedAt);
-                        return completedDate >= oneDayAgo; // Todo hoàn thành trong 24h gần nhất
+                        return completedDate >= fourHoursAgo;
+                    }
+                    return false;
+                });
+                break;
+            case '8h':
+                // Hiển thị todo đã hoàn thành trong 8h gần nhất
+                const now8h = new Date();
+                const eightHoursAgo = new Date(now8h.getTime() - 8 * 60 * 60 * 1000);
+                
+                matchingTodos = projectTodos.filter(t => {
+                    if (t.completed && t.completedAt) {
+                        const completedDate = new Date(t.completedAt);
+                        return completedDate >= eightHoursAgo;
+                    }
+                    return false;
+                });
+                break;
+            case '24h':
+                // Hiển thị todo đã hoàn thành trong 24h gần nhất
+                const now24h = new Date();
+                const oneDayAgo = new Date(now24h.getTime() - 24 * 60 * 60 * 1000);
+                
+                matchingTodos = projectTodos.filter(t => {
+                    if (t.completed && t.completedAt) {
+                        const completedDate = new Date(t.completedAt);
+                        return completedDate >= oneDayAgo;
                     }
                     return false;
                 });
@@ -1546,35 +1585,60 @@ class TodoApp {
         const allTodos = this.todos;
         const totalCount = allTodos.length;
         
-        // Đếm pending: todo chưa hoàn thành + todo hoàn thành trong 24h gần nhất
+        // Đếm pending: chỉ todo chưa hoàn thành
+        const pendingCount = allTodos.filter(t => !t.completed && !t.skipped).length;
+        
+        // Đếm completed trong các khoảng thời gian
         const now = new Date();
+        const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000);
+        const eightHoursAgo = new Date(now.getTime() - 8 * 60 * 60 * 1000);
         const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        const pendingCount = allTodos.filter(t => {
-            if (!t.completed && !t.skipped) {
-                return true; // Todo chưa hoàn thành
-            }
+        
+        const count4h = allTodos.filter(t => {
             if (t.completed && t.completedAt) {
                 const completedDate = new Date(t.completedAt);
-                return completedDate >= oneDayAgo; // Todo hoàn thành trong 24h gần nhất
+                return completedDate >= fourHoursAgo;
             }
             return false;
         }).length;
         
-        const completedCount = allTodos.filter(t => t.completed).length;
+        const count8h = allTodos.filter(t => {
+            if (t.completed && t.completedAt) {
+                const completedDate = new Date(t.completedAt);
+                return completedDate >= eightHoursAgo;
+            }
+            return false;
+        }).length;
+        
+        const count24h = allTodos.filter(t => {
+            if (t.completed && t.completedAt) {
+                const completedDate = new Date(t.completedAt);
+                return completedDate >= oneDayAgo;
+            }
+            return false;
+        }).length;
         
         // Update filter button texts with counts
         const allBtn = document.querySelector('[data-filter="all"]');
         const pendingBtn = document.querySelector('[data-filter="pending"]');
-        const completedBtn = document.querySelector('[data-filter="completed"]');
+        const btn4h = document.querySelector('[data-filter="4h"]');
+        const btn8h = document.querySelector('[data-filter="8h"]');
+        const btn24h = document.querySelector('[data-filter="24h"]');
         
         if (allBtn) {
-            allBtn.innerHTML = `<i class="fas fa-list"></i> Tất cả (${totalCount})`;
+            allBtn.innerHTML = `<i class="fas fa-list"></i> All (${totalCount})`;
         }
         if (pendingBtn) {
             pendingBtn.innerHTML = `<i class="fas fa-clock"></i> Còn (${pendingCount})`;
         }
-        if (completedBtn) {
-            completedBtn.innerHTML = `<i class="fas fa-check"></i> Xong (${completedCount})`;
+        if (btn4h) {
+            btn4h.innerHTML = `<i class="fas fa-history"></i> 4h (${count4h})`;
+        }
+        if (btn8h) {
+            btn8h.innerHTML = `<i class="fas fa-history"></i> 8h (${count8h})`;
+        }
+        if (btn24h) {
+            btn24h.innerHTML = `<i class="fas fa-history"></i> 24h (${count24h})`;
         }
     }
 
@@ -1696,17 +1760,46 @@ class TodoApp {
         let matchingTodos = [];
         switch (this.currentFilter) {
             case 'pending':
-                // Hiển thị todo chưa hoàn thành + todo đã hoàn thành trong 24h gần nhất
-                const now = new Date();
-                const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                // Chỉ hiển thị todo chưa hoàn thành (bỏ todo đã xong trong 24h)
+                matchingTodos = projectTodos.filter(t => {
+                    return !t.completed && !t.skipped; // Chỉ todo chưa hoàn thành
+                });
+                break;
+            case '4h':
+                // Hiển thị todo đã hoàn thành trong 4h gần nhất
+                const now4h = new Date();
+                const fourHoursAgo = new Date(now4h.getTime() - 4 * 60 * 60 * 1000);
                 
                 matchingTodos = projectTodos.filter(t => {
-                    if (!t.completed && !t.skipped) {
-                        return true; // Todo chưa hoàn thành
-                    }
                     if (t.completed && t.completedAt) {
                         const completedDate = new Date(t.completedAt);
-                        return completedDate >= oneDayAgo; // Todo hoàn thành trong 24h gần nhất
+                        return completedDate >= fourHoursAgo;
+                    }
+                    return false;
+                });
+                break;
+            case '8h':
+                // Hiển thị todo đã hoàn thành trong 8h gần nhất
+                const now8h = new Date();
+                const eightHoursAgo = new Date(now8h.getTime() - 8 * 60 * 60 * 1000);
+                
+                matchingTodos = projectTodos.filter(t => {
+                    if (t.completed && t.completedAt) {
+                        const completedDate = new Date(t.completedAt);
+                        return completedDate >= eightHoursAgo;
+                    }
+                    return false;
+                });
+                break;
+            case '24h':
+                // Hiển thị todo đã hoàn thành trong 24h gần nhất
+                const now24h = new Date();
+                const oneDayAgo = new Date(now24h.getTime() - 24 * 60 * 60 * 1000);
+                
+                matchingTodos = projectTodos.filter(t => {
+                    if (t.completed && t.completedAt) {
+                        const completedDate = new Date(t.completedAt);
+                        return completedDate >= oneDayAgo;
                     }
                     return false;
                 });
@@ -1970,6 +2063,14 @@ class TodoApp {
         // Khôi phục vị trí scroll sau khi render
         setTimeout(() => {
             this.restoreScrollPositions(scrollPositions);
+            
+            // Update sticky observers sau khi render hoàn tất
+            if (this.updateStickyObservers) {
+                this.updateStickyObservers();
+            }
+            if (this.observeScrollContainers) {
+                this.observeScrollContainers();
+            }
         }, 10);
     }
 
@@ -2740,6 +2841,74 @@ class TodoApp {
                 }
             }, 200);
         }
+    }
+
+    // Initialize sticky behavior cho Todo Root level-1
+    initStickyBehavior() {
+        // Set up IntersectionObserver để detect khi sticky elements thay đổi state
+        const stickyObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                const stickyElement = entry.target;
+                const rect = entry.boundingClientRect;
+                const rootRect = entry.rootBounds;
+                
+                // Check if element is stuck to top (sticky state)
+                if (rect.top <= rootRect.top && rect.bottom > rootRect.top) {
+                    stickyElement.classList.add('sticky-active');
+                } else {
+                    stickyElement.classList.remove('sticky-active');
+                }
+            });
+        }, {
+            threshold: [0, 0.1, 1],
+            rootMargin: '0px 0px 0px 0px'
+        });
+
+        // Setup scroll listener để update sticky observers sau mỗi render
+        this.setupStickyScrollListener(stickyObserver);
+    }
+
+    // Setup scroll listener để monitor sticky behavior
+    setupStickyScrollListener(observer) {
+        // Function để update observers sau khi render
+        const updateStickyObservers = () => {
+            // Tìm tất cả todo gốc (không có level class)
+            const rootTodos = document.querySelectorAll('.todo-item:not([class*="level-"])');
+            
+            // Unobserve old elements
+            observer.disconnect();
+            
+            // Observe new root todos
+            rootTodos.forEach(element => {
+                observer.observe(element);
+            });
+        };
+
+        // Listen cho scroll events trên todo lists
+        document.addEventListener('scroll', () => {
+            // Update observers nếu cần
+            updateStickyObservers();
+        }, { passive: true });
+
+        // Listen cho scroll events trên từng todo-list container
+        const observeScrollContainers = () => {
+            const todoLists = document.querySelectorAll('.todo-list');
+            todoLists.forEach(container => {
+                container.addEventListener('scroll', () => {
+                    updateStickyObservers();
+                }, { passive: true });
+            });
+        };
+
+        // Observe scroll containers ban đầu
+        observeScrollContainers();
+
+        // Store function để có thể gọi lại sau render
+        this.updateStickyObservers = updateStickyObservers;
+        this.observeScrollContainers = observeScrollContainers;
+
+        // Initial setup
+        setTimeout(updateStickyObservers, 100);
     }
 
 }

@@ -25,11 +25,6 @@
                     </button>
                 </div>
                 <div class="calendar-actions">
-                    <div class="project-filter">
-                        <select id="projectFilter" onchange="calendarApp.setProjectFilter(this.value)">
-                            <option value="all">Tất cả dự án</option>
-                        </select>
-                    </div>
                     <div class="view-toggle">
                         <div class="week-dropdown">
                             <button class="view-btn active" id="weekViewBtn" onclick="calendarApp.toggleWeekDropdown()">
@@ -55,31 +50,69 @@
                             <i class="fas fa-calendar-alt"></i> Tháng
                         </button>
                     </div>
-                    <div class="status-filter">
-                        <button class="filter-btn active" id="statusFilterBtn" onclick="calendarApp.toggleStatusFilter()">
-                            <div class="filter-color" id="statusFilterColor"></div>
-                            <span id="statusFilterText">Chưa hoàn thành</span>
-                        </button>
-                    </div>
                     <button class="today-btn" onclick="calendarApp.goToToday()">
                         <i class="fas fa-calendar-day"></i> Hôm nay
                     </button>
                 </div>
             </div>
             
-            <div class="calendar-container">
-                <div class="calendar-header" id="calendarHeader">
-                    <div class="week-number-header">Tuần</div>
-                    <div class="day-header">CN</div>
-                    <div class="day-header">T2</div>
-                    <div class="day-header">T3</div>
-                    <div class="day-header">T4</div>
-                    <div class="day-header">T5</div>
-                    <div class="day-header">T6</div>
-                    <div class="day-header">T7</div>
+            <div class="calendar-main">
+                <div class="calendar-container">
+                    <div class="calendar-header" id="calendarHeader">
+                        <div class="week-number-header">Tuần</div>
+                        <div class="day-header">CN</div>
+                        <div class="day-header">T2</div>
+                        <div class="day-header">T3</div>
+                        <div class="day-header">T4</div>
+                        <div class="day-header">T5</div>
+                        <div class="day-header">T6</div>
+                        <div class="day-header">T7</div>
+                    </div>
+                    <div class="calendar-grid" id="calendarGrid">
+                        <!-- Calendar days will be rendered here -->
+                    </div>
                 </div>
-                <div class="calendar-grid" id="calendarGrid">
-                    <!-- Calendar days will be rendered here -->
+                
+                <div class="calendar-sidebar">
+                    <div class="sidebar-section">
+                        <h3>Dự án</h3>
+                        <div class="project-list" id="projectList">
+                            <!-- Project checkboxes will be rendered here -->
+                        </div>
+                    </div>
+                    
+                    <div class="sidebar-section">
+                        <h3>Trạng thái</h3>
+                        <div class="status-filter-group">
+                            <button class="status-filter-btn" id="statusPendingBtn" onclick="calendarApp.setStatusFilter('pending')">
+                                Còn
+                            </button>
+                            <button class="status-filter-btn" id="statusCompletedBtn" onclick="calendarApp.setStatusFilter('completed')">
+                                Xong
+                            </button>
+                            <button class="status-filter-btn" id="statusAllBtn" onclick="calendarApp.setStatusFilter('all')">
+                                Tất cả
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="sidebar-section">
+                        <h3>Cấp độ</h3>
+                        <div class="level-filter-group">
+                            <button class="level-filter-btn" id="level0Btn" onclick="calendarApp.setLevelFilter(0)">
+                                0
+                            </button>
+                            <button class="level-filter-btn" id="level1Btn" onclick="calendarApp.setLevelFilter(1)">
+                                1
+                            </button>
+                            <button class="level-filter-btn" id="level2Btn" onclick="calendarApp.setLevelFilter(2)">
+                                2
+                            </button>
+                            <button class="level-filter-btn" id="level3Btn" onclick="calendarApp.setLevelFilter(3)">
+                                3
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
             

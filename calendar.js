@@ -4,8 +4,9 @@ class CalendarApp {
         this.currentDate = new Date();
         this.currentView = 'week'; // 'month' or 'week' - mặc định là week
         this.weekMode = '624'; // 'normal', '85', '624' - mặc định là 624
-        this.selectedProjectId = 'all'; // Filter project
+        this.selectedProjectIds = []; // Filter projects - array of project IDs
         this.selectedStatusFilter = 'pending'; // Filter status: 'pending', 'completed', 'all' - mặc định là pending
+        this.selectedLevelFilter = 2; // Filter level: 0, 1, 2, 3 - mặc định là 2
         this.todos = this.loadTodos();
         this.projects = this.loadProjects();
         this.init();
@@ -16,7 +17,7 @@ class CalendarApp {
         this.todos = this.loadTodos();
         this.projects = this.loadProjects();
         
-        this.populateProjectFilter();
+        this.populateProjectList();
         this.renderCalendar();
         this.updateDisplay();
         
@@ -29,8 +30,16 @@ class CalendarApp {
         document.getElementById('monthViewBtn').classList.toggle('active', this.currentView === 'month');
         document.getElementById('weekViewBtn').classList.toggle('active', this.currentView === 'week');
         
-        // Update status filter display
-        this.updateStatusFilterDisplay();
+        // Update status filter buttons
+        document.getElementById('statusPendingBtn').classList.toggle('active', this.selectedStatusFilter === 'pending');
+        document.getElementById('statusCompletedBtn').classList.toggle('active', this.selectedStatusFilter === 'completed');
+        document.getElementById('statusAllBtn').classList.toggle('active', this.selectedStatusFilter === 'all');
+        
+        // Update level filter buttons
+        document.getElementById('level0Btn').classList.toggle('active', this.selectedLevelFilter === 0);
+        document.getElementById('level1Btn').classList.toggle('active', this.selectedLevelFilter === 1);
+        document.getElementById('level2Btn').classList.toggle('active', this.selectedLevelFilter === 2);
+        document.getElementById('level3Btn').classList.toggle('active', this.selectedLevelFilter === 3);
         
         // Update week dropdown state
         this.updateWeekDropdownState();
@@ -60,11 +69,12 @@ class CalendarApp {
         const calendarGrid = document.getElementById('calendarGrid');
         const calendarHeader = document.getElementById('calendarHeader');
         
+        // Luôn ẩn calendar-header vì chúng ta sẽ render header trong grid
+        calendarHeader.style.display = 'none';
+        
         if (this.currentView === 'week') {
-            calendarHeader.style.display = 'none'; // Ẩn header cho week view
             this.renderWeekView(calendarGrid);
         } else {
-            calendarHeader.style.display = 'grid'; // Hiển thị header cho month view
             this.renderMonthView(calendarGrid);
         }
     }
@@ -283,6 +293,25 @@ class CalendarApp {
         return '';
     }
 
+    // Hàm xây dựng cấu trúc cha-con cho tooltip
+    buildParentChildPath(todo) {
+        const path = [todo.text];
+        let currentTodo = todo;
+        
+        // Tìm parent cho đến khi gặp root
+        while (currentTodo.parentId) {
+            const parent = this.todos.find(t => t.id === currentTodo.parentId);
+            if (parent) {
+                path.unshift(parent.text);
+                currentTodo = parent;
+            } else {
+                break;
+            }
+        }
+        
+        return path.join(' ▶ ');
+    }
+
     getTodosForHour(dayTodos, hour, isToday, currentHour) {
         let todosHtml = '';
         let todoIndex = 0;
@@ -295,7 +324,7 @@ class CalendarApp {
             }
             
             // Filter theo project
-            if (this.selectedProjectId !== 'all' && String(todo.projectId) !== String(this.selectedProjectId)) {
+            if (this.selectedProjectIds.length > 0 && !this.selectedProjectIds.includes(String(todo.projectId))) {
                 return false;
             }
             
@@ -309,8 +338,8 @@ class CalendarApp {
                 }
             }
             
-            // Chỉ hiển thị 2 level: root (level 1) và todo con (level 2)
-            if (todo.level > 2) {
+            // Filter theo level
+            if (todo.level > this.selectedLevelFilter) {
                 return false;
             }
             
@@ -331,43 +360,48 @@ class CalendarApp {
             return shouldShowInHour;
         });
         
-        // Sắp xếp todos theo thứ tự ưu tiên (đồng nhất với màn chính)
+        // Sắp xếp todos theo thời gian tạo (đơn giản)
         todosInHour.sort((a, b) => {
-            // 1. Sắp xếp theo level (cha trước con)
-            if (a.level !== b.level) {
-                return a.level - b.level;
-            }
-            
-            // 2. Sắp xếp theo parentId (cùng level, cùng parent)
-            if (a.parentId !== b.parentId) {
-                if (!a.parentId && b.parentId) return -1; // a là root, b là con
-                if (a.parentId && !b.parentId) return 1;  // a là con, b là root
-                return (a.parentId || '').localeCompare(b.parentId || '');
-            }
-            
-            // 3. Sắp xếp theo order (thứ tự trong cùng parent)
-            if (a.order !== undefined && b.order !== undefined) {
-                return a.order - b.order;
-            }
-            
-            // 4. Fallback: sắp xếp theo thời gian tạo
             return new Date(a.createdAt) - new Date(b.createdAt);
         });
         
         // Render todos đã sắp xếp
         todosInHour.forEach(todo => {
             const topOffset = todoIndex * 20; // Offset để không chồng lên nhau
+            const tooltipText = this.buildParentChildPath(todo);
+            
+            // Lấy màu project
+            const project = this.projects.find(p => p.id === todo.projectId);
+            const projectColor = project ? project.color : '#e0e0e0';
+            
             todosHtml += `
                 <div class="todo-item-24h ${todo.completed ? 'completed' : 'pending'} level-${todo.level}"
-                     style="top: ${topOffset}px; height: 18px;"
-                     title="${todo.text}">
-                    ${this.truncateText(todo.text, 15)}
+                     style="top: ${topOffset}px; height: 18px; background: ${projectColor};"
+                     title="${tooltipText}">
+                    ${this.getTodoDisplayText(todo, 15)}
                 </div>
             `;
             todoIndex++;
         });
         
         return { todosHtml, todoCount: todoIndex };
+    }
+
+    addMonthHeaderToGrid(calendarGrid) {
+        // Thêm week number header
+        const weekNumberHeader = document.createElement('div');
+        weekNumberHeader.className = 'week-number-header';
+        weekNumberHeader.textContent = 'Tuần';
+        calendarGrid.appendChild(weekNumberHeader);
+        
+        // Thêm day headers
+        const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+        dayNames.forEach(dayName => {
+            const dayHeader = document.createElement('div');
+            dayHeader.className = 'day-header';
+            dayHeader.textContent = dayName;
+            calendarGrid.appendChild(dayHeader);
+        });
     }
 
     renderMonthView(calendarGrid) {
@@ -386,6 +420,9 @@ class CalendarApp {
         const daysInPrevMonth = prevMonth.getDate();
         
         calendarGrid.innerHTML = '';
+        
+        // Thêm header row vào grid
+        this.addMonthHeaderToGrid(calendarGrid);
         
         // Tạo mảng tất cả các ngày sẽ hiển thị
         const allDays = [];
@@ -485,7 +522,7 @@ class CalendarApp {
                 ${dayTodos.map(todo => `
                     <div class="todo-item-calendar ${todo.completed ? 'completed' : 'pending'} level-${todo.level}" 
                          title="${todo.text}">
-                        ${this.truncateText(todo.text, 20)}
+                        ${this.getTodoDisplayText(todo, 20)}
                     </div>
                 `).join('')}
             </div>
@@ -514,7 +551,7 @@ class CalendarApp {
             }
             
             // Filter theo project
-            if (this.selectedProjectId !== 'all' && String(todo.projectId) !== String(this.selectedProjectId)) {
+            if (this.selectedProjectIds.length > 0 && !this.selectedProjectIds.includes(String(todo.projectId))) {
                 return false;
             }
             
@@ -528,18 +565,12 @@ class CalendarApp {
                 }
             }
             
-            // Chỉ hiển thị 2 level: root (level 1) và todo con (level 2)
-            if (todo.level > 2) {
+            // Filter theo level
+            if (todo.level > this.selectedLevelFilter) {
                 return false;
             }
             
-            // 1. Todo được tạo trong ngày này - luôn hiển thị
-            const todoCreatedDateString = this.getLocalDateString(new Date(todo.createdAt));
-            if (todoCreatedDateString === targetDateString) {
-                return true;
-            }
-            
-            // 2. Todo đã hoàn thành trong ngày này - hiển thị nếu có completedAt
+            // Hiển thị todo đã hoàn thành trong ngày này
             if (todo.completed && todo.completedAt) {
                 const completedDateString = this.getLocalDateString(new Date(todo.completedAt));
                 if (completedDateString === targetDateString) {
@@ -547,11 +578,10 @@ class CalendarApp {
                 }
             }
             
-            // 3. Todo chưa hoàn thành - chỉ hiển thị ở hôm nay và được tạo trước đó
-            if (!todo.completed && isToday) {
-                const todoCreatedDate = new Date(todo.createdAt);
-                // Hiển thị todos được tạo trước hôm nay
-                if (todoCreatedDate < today) {
+            // Hiển thị todo chưa hoàn thành ở ngày được tạo
+            if (!todo.completed) {
+                const todoCreatedDateString = this.getLocalDateString(new Date(todo.createdAt));
+                if (todoCreatedDateString === targetDateString) {
                     return true;
                 }
             }
@@ -571,6 +601,17 @@ class CalendarApp {
     truncateText(text, maxLength) {
         if (text.length <= maxLength) return text;
         return text.substring(0, maxLength) + '...';
+    }
+
+    getTodoDisplayText(todo, maxLength) {
+        // Thêm prefix (・) cho todo con (level > 0)
+        let displayText = todo.text;
+        if (todo.level > 0) {
+            const prefix = '・'.repeat(todo.level);
+            displayText = prefix + displayText;
+        }
+        
+        return this.truncateText(displayText, maxLength);
     }
 
     showDayDetails(date, todos) {
@@ -757,75 +798,90 @@ class CalendarApp {
         this.updateDisplay();
     }
 
-    populateProjectFilter() {
-        const projectFilter = document.getElementById('projectFilter');
-        if (!projectFilter) return;
+    populateProjectList() {
+        const projectList = document.getElementById('projectList');
+        if (!projectList) return;
         
         console.log('Projects loaded:', this.projects);
         
-        // Clear existing options except "Tất cả dự án"
-        projectFilter.innerHTML = '<option value="all">Tất cả dự án</option>';
+        // Clear existing project list
+        projectList.innerHTML = '';
         
-        // Add project options
+        // Add project checkboxes
         this.projects.forEach(project => {
-            const option = document.createElement('option');
-            option.value = project.id;
-            option.textContent = project.name;
-            projectFilter.appendChild(option);
+            const projectItem = document.createElement('div');
+            projectItem.className = 'project-item';
+            projectItem.innerHTML = `
+                <input type="checkbox" class="project-checkbox" id="project-${project.id}" 
+                       value="${project.id}" onchange="calendarApp.toggleProjectFilter('${project.id}')">
+                <label for="project-${project.id}" class="project-name" 
+                       style="background: ${project.color}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;">
+                    ${project.name}
+                </label>
+            `;
+            
+            // Thêm event listener cho toàn bộ project-item
+            projectItem.addEventListener('click', (e) => {
+                // Chỉ xử lý nếu không click vào checkbox hoặc label
+                if (e.target !== projectItem.querySelector('.project-checkbox') && 
+                    e.target !== projectItem.querySelector('.project-name')) {
+                    calendarApp.toggleProjectFilter(project.id);
+                }
+            });
+            
+            projectList.appendChild(projectItem);
         });
     }
 
-    setProjectFilter(projectId) {
-        this.selectedProjectId = projectId;
-        console.log('Project filter changed to:', projectId);
+    toggleProjectFilter(projectId) {
+        const index = this.selectedProjectIds.indexOf(projectId);
+        if (index > -1) {
+            this.selectedProjectIds.splice(index, 1);
+        } else {
+            this.selectedProjectIds.push(projectId);
+        }
+        
+        console.log('Project filter changed to:', this.selectedProjectIds);
+        
+        // Update project item visual state
+        const projectItem = document.querySelector(`#project-${projectId}`).closest('.project-item');
+        projectItem.classList.toggle('checked', this.selectedProjectIds.includes(projectId));
         
         // Refresh data from localStorage
         this.todos = this.loadTodos();
         this.projects = this.loadProjects();
         
-        console.log('Current todos:', this.todos);
-        console.log('Current projects:', this.projects);
+        this.renderCalendar();
+    }
+
+    setStatusFilter(status) {
+        this.selectedStatusFilter = status;
+        console.log('Status filter changed to:', status);
+        
+        // Update button states
+        this.updateButtonStates();
+        
+        // Refresh data from localStorage
+        this.todos = this.loadTodos();
+        this.projects = this.loadProjects();
         
         this.renderCalendar();
     }
 
-    toggleStatusFilter() {
-        // Xoay vòng theo thứ tự: pending → completed → all
-        const statusOrder = ['pending', 'completed', 'all'];
-        const currentIndex = statusOrder.indexOf(this.selectedStatusFilter);
-        const nextIndex = (currentIndex + 1) % statusOrder.length;
+    setLevelFilter(level) {
+        this.selectedLevelFilter = level;
+        console.log('Level filter changed to:', level);
         
-        this.selectedStatusFilter = statusOrder[nextIndex];
-        console.log('Status filter changed to:', this.selectedStatusFilter);
+        // Update button states
+        this.updateButtonStates();
         
-        // Update button display
-        this.updateStatusFilterDisplay();
+        // Refresh data from localStorage
+        this.todos = this.loadTodos();
+        this.projects = this.loadProjects();
         
         this.renderCalendar();
     }
 
-    updateStatusFilterDisplay() {
-        const statusFilterBtn = document.getElementById('statusFilterBtn');
-        const statusFilterColor = document.getElementById('statusFilterColor');
-        const statusFilterText = document.getElementById('statusFilterText');
-        
-        if (!statusFilterBtn || !statusFilterColor || !statusFilterText) return;
-        
-        switch (this.selectedStatusFilter) {
-            case 'pending':
-                statusFilterColor.className = 'filter-color pending';
-                statusFilterText.textContent = 'Chưa hoàn thành';
-                break;
-            case 'completed':
-                statusFilterColor.className = 'filter-color completed';
-                statusFilterText.textContent = 'Đã hoàn thành';
-                break;
-            case 'all':
-                statusFilterColor.className = 'filter-color all';
-                statusFilterText.textContent = 'Tất cả';
-                break;
-        }
-    }
 
     goBack() {
         // Lưu dữ liệu hiện tại trước khi quay lại
