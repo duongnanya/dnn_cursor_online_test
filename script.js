@@ -5,14 +5,18 @@ class TodoApp {
         this.currentProjectId = null;
         this.todos = [];
         this.currentFilter = 'pending'; // Mặc định hiển thị "Còn"
+        this.cycleFilters = ['4h', '8h', '24h', 'all']; // Thứ tự quay vòng
+        this.currentCycleIndex = 0; // Index hiện tại trong cycle
+        this.isCycleButtonActive = false; // Theo dõi cycle button có đang active không
         this.searchQuery = '';
         this.draggedTodo = null;
         this.dropTarget = null;
         this.selectedTodos = new Set();
         this.parentSelectionMode = false;
         this.selectedChildId = null;
-        this.prioritySelectionMode = false;
-        this.selectedPriorityTodoId = null;
+        this.moveSelectionMode = false;
+        this.selectedMoveTodoId = null;
+        this.savedCollapseState = null; // Lưu trạng thái collapse trước khi move
         this.collapsedTodos = new Set();
         
         // Firebase properties
@@ -147,6 +151,9 @@ class TodoApp {
         this.initFirebase();
         // Đợi Firebase khởi tạo xong mới xử lý UI
         // Logic hiển thị UI sẽ được xử lý trong handleAuthStateChange()
+        
+        // Set active state ban đầu cho filter buttons
+        this.setInitialFilterState();
     }
 
     bindEvents() {
@@ -229,8 +236,8 @@ class TodoApp {
                 this.cancelParentSelection();
             }
             
-            if (this.prioritySelectionMode && !e.target.closest('.todo-item') && !e.target.closest('.filter-btn')) {
-                this.cancelPrioritySelection();
+            if (this.moveSelectionMode && !e.target.closest('.todo-item') && !e.target.closest('.filter-btn')) {
+                this.cancelMoveSelection();
             }
         });
 
@@ -243,8 +250,12 @@ class TodoApp {
                 
                 // Tìm button element (có thể click vào icon hoặc text)
                 const button = e.target.closest('.filter-btn');
-                if (button && button.dataset.filter) {
-                    this.setFilter(button.dataset.filter);
+                if (button) {
+                    if (button.dataset.filter) {
+                        this.setFilter(button.dataset.filter);
+                    } else if (button.id === 'cycleFilterBtn') {
+                        this.cycleFilter();
+                    }
                 }
             });
         });
@@ -671,13 +682,20 @@ class TodoApp {
         this.showMessage('Chọn todo cha cho todo này', 'info');
     }
 
-    // Start priority selection mode
-    startPrioritySelection(todoId) {
-        this.selectedPriorityTodoId = todoId;
-        this.prioritySelectionMode = true;
-        document.body.classList.add('priority-selection-mode');
+    // Start move selection mode
+    startMoveSelection(todoId) {
+        this.selectedMoveTodoId = todoId;
+        this.moveSelectionMode = true;
+        document.body.classList.add('move-selection-mode');
+        
+        // Lưu trạng thái collapse hiện tại trước khi thay đổi
+        this.saveCollapseState();
+        
+        // Auto collapse tất cả todo con/cháu để UI rõ ràng hơn
+        this.collapseAllChildren();
+        
         this.render();
-        this.showMessage('Chọn todo anh em để đưa todo hiện tại lên trên', 'info');
+        this.showMessage('Chọn khe để chèn todo vào vị trí mong muốn', 'info');
     }
 
     // Cancel parent selection mode
@@ -688,11 +706,15 @@ class TodoApp {
         this.render();
     }
 
-    // Cancel priority selection mode
-    cancelPrioritySelection() {
-        this.prioritySelectionMode = false;
-        this.selectedPriorityTodoId = null;
-        document.body.classList.remove('priority-selection-mode');
+    // Cancel move selection mode
+    cancelMoveSelection() {
+        this.moveSelectionMode = false;
+        this.selectedMoveTodoId = null;
+        document.body.classList.remove('move-selection-mode');
+        
+        // Khôi phục trạng thái collapse ban đầu
+        this.restoreCollapseState();
+        
         this.render();
     }
 
@@ -726,53 +748,54 @@ class TodoApp {
         this.saveTodos();
     }
 
-    // Select priority position
-    selectPriority(targetTodoId) {
-        if (!this.prioritySelectionMode || !this.selectedPriorityTodoId) return;
+    // Select position slot to move todo
+    selectMoveSlot(targetTodoId, position) {
+        if (!this.moveSelectionMode || !this.selectedMoveTodoId) return;
         
-        const selectedTodo = this.todos.find(t => t.id === this.selectedPriorityTodoId);
+        const selectedTodo = this.todos.find(t => t.id === this.selectedMoveTodoId);
         const targetTodo = this.todos.find(t => t.id === targetTodoId);
         
         if (!selectedTodo || !targetTodo) return;
         
-        console.log('Priority selection:', {
-            selected: selectedTodo.text,
-            target: targetTodo.text,
-            selectedOrder: selectedTodo.order,
-            targetOrder: targetTodo.order
-        });
-        
         // Kiểm tra xem 2 todo có cùng parent không (anh em)
         if (selectedTodo.parentId !== targetTodo.parentId) {
-            this.showMessage('Chỉ có thể sắp xếp với todo anh em (cùng cha)!', 'warning');
+            this.showMessage('Chỉ có thể di chuyển giữa các todo anh em (cùng cha)!', 'warning');
             return;
         }
         
-        // Lấy order của target todo
-        const targetOrder = targetTodo.order;
+        // Lấy tất cả siblings và sắp xếp theo order
+        const siblings = this.todos
+            .filter(t => t.parentId === selectedTodo.parentId && t.projectId === selectedTodo.projectId && t.id !== selectedTodo.id)
+            .sort((a, b) => a.order - b.order);
+            
+        const targetIndex = siblings.findIndex(t => t.id === targetTodoId);
         
-        // Cập nhật order của selected todo để đưa lên trên target
-        selectedTodo.order = targetOrder - 0.5;
+        let newOrder;
+        if (position === 'before') {
+            // Chèn trước target
+            if (targetIndex === 0) {
+                newOrder = targetTodo.order - 1;
+            } else {
+                const prevTodo = siblings[targetIndex - 1];
+                newOrder = (prevTodo.order + targetTodo.order) / 2;
+            }
+        } else {
+            // Chèn sau target
+            if (targetIndex === siblings.length - 1) {
+                newOrder = targetTodo.order + 1;
+            } else {
+                const nextTodo = siblings[targetIndex + 1];
+                newOrder = (targetTodo.order + nextTodo.order) / 2;
+            }
+        }
         
-        console.log('After order update:', {
-            selectedNewOrder: selectedTodo.order
-        });
+        selectedTodo.order = newOrder;
         
-        // Chuẩn hóa lại order cho tất cả siblings
-        this.normalizeOrderForSiblings(selectedTodo.parentId, selectedTodo.projectId);
-        
-        console.log('After normalize:', {
-            siblings: this.todos
-                .filter(t => t.parentId === selectedTodo.parentId && t.projectId === selectedTodo.projectId)
-                .map(t => ({ text: t.text, order: t.order }))
-                .sort((a, b) => a.order - b.order)
-        });
-        
-        this.cancelPrioritySelection();
+        this.cancelMoveSelection();
         
         // Cập nhật UI ngay lập tức
         this.render();
-        this.showMessage('Đã sắp xếp thứ tự ưu tiên!', 'success');
+        this.showMessage('Đã di chuyển todo thành công!', 'success');
         
         // Sync Firebase ở background
         this.saveTodos();
@@ -784,6 +807,7 @@ class TodoApp {
             .filter(t => t.parentId === parentId && t.projectId === projectId)
             .sort((a, b) => a.order - b.order);
         
+        // Chỉ gán lại order thành số nguyên liên tiếp, giữ nguyên thứ tự tương đối
         siblings.forEach((todo, index) => {
             todo.order = index;
         });
@@ -833,9 +857,8 @@ class TodoApp {
         child.level = parent.level + 1;
         child.projectId = parent.projectId; // Move child to parent's project
 
-        // Update order for new siblings
-        const newSiblings = this.todos.filter(t => t.parentId === parentId && t.id !== childId && t.projectId === parent.projectId);
-        child.order = newSiblings.length;
+        // Giữ nguyên order của child để không thay đổi thứ tự siblings
+        // child.order giữ nguyên giá trị hiện tại
 
         // Update order for old siblings
         if (oldParentId !== null) {
@@ -936,6 +959,51 @@ class TodoApp {
         }
         
         this.render(); // Render lại để áp dụng thay đổi
+    }
+
+    // Lưu trạng thái collapse hiện tại
+    saveCollapseState() {
+        this.savedCollapseState = new Set(this.collapsedTodos);
+    }
+    
+    // Khôi phục trạng thái collapse đã lưu
+    restoreCollapseState() {
+        if (this.savedCollapseState !== null) {
+            this.collapsedTodos = new Set(this.savedCollapseState);
+            this.savedCollapseState = null;
+        }
+    }
+
+    // Collapse all children/descendants for cleaner UI in move mode
+    collapseAllChildren() {
+        if (!this.selectedMoveTodoId) return;
+        
+        const selectedTodo = this.todos.find(t => t.id === this.selectedMoveTodoId);
+        if (!selectedTodo) return;
+        
+        // Collapse bản thân todo được chọn nếu nó có children
+        if (this.hasChildren(selectedTodo.id)) {
+            this.collapsedTodos.add(selectedTodo.id);
+        }
+        
+        // Collapse các todo cùng mức với todo được chọn
+        const todosToCollapse = this.todos.filter(todo => {
+            // Chỉ collapse todo có children
+            if (!this.hasChildren(todo.id)) return false;
+            
+            // Nếu todo được chọn là root (không có parent)
+            if (!selectedTodo.parentId) {
+                // Collapse các todo root khác (không bao gồm bản thân)
+                return !todo.parentId && todo.id !== selectedTodo.id;
+            }
+            
+            // Nếu todo được chọn có parent, collapse các todo cùng parent (không bao gồm bản thân)
+            return todo.parentId === selectedTodo.parentId && todo.id !== selectedTodo.id;
+        });
+        
+        todosToCollapse.forEach(todo => {
+            this.collapsedTodos.add(todo.id);
+        });
     }
 
     // Check if todo is collapsed
@@ -1572,13 +1640,69 @@ class TodoApp {
     setFilter(filter) {
         this.currentFilter = filter;
         
+        // Nếu filter thuộc cycle filters, cập nhật currentCycleIndex
+        if (this.cycleFilters.includes(filter)) {
+            this.currentCycleIndex = this.cycleFilters.indexOf(filter);
+            this.isCycleButtonActive = true; // Đánh dấu cycle button active
+        } else if (filter === 'pending') {
+            this.isCycleButtonActive = false; // Đặt cycle button không active nhưng GIỮ NGUYÊN currentCycleIndex
+        }
+        
         // Update active filter button
         document.querySelectorAll('.filter-btn').forEach(btn => {
             btn.classList.remove('active');
         });
+        
+        // Chỉ active nút "Còn" khi filter là pending
+        if (filter === 'pending') {
         document.querySelector(`[data-filter="${filter}"]`).classList.add('active');
+        } else {
+            // Active cycle button khi filter khác pending
+            document.getElementById('cycleFilterBtn').classList.add('active');
+        }
         
         this.render();
+    }
+
+    // Quay vòng filter cho cycle button
+    cycleFilter() {
+        if (!this.isCycleButtonActive) {
+            // Lần đầu click từ nút "Còn": hiển thị filter tương ứng vị trí cycle hiện tại
+            this.isCycleButtonActive = true;
+            this.currentFilter = this.cycleFilters[this.currentCycleIndex]; // Hiển thị đúng vị trí cycle
+        } else {
+            // Lần click thứ 2 trở đi: cycle sang filter tiếp theo
+            this.currentCycleIndex = (this.currentCycleIndex + 1) % this.cycleFilters.length;
+            this.currentFilter = this.cycleFilters[this.currentCycleIndex];
+        }
+        
+        // Cập nhật active state - active cycle button
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        document.getElementById('cycleFilterBtn').classList.add('active');
+        
+        // Cập nhật count cho cycle button
+        this.updateFilterButtons();
+        
+        // Render lại
+        this.render();
+    }
+
+    // Set active state ban đầu cho filter buttons
+    setInitialFilterState() {
+        // Đợi DOM load xong
+        setTimeout(() => {
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Active nút "Còn" mặc định vì currentFilter = 'pending'
+            const pendingBtn = document.querySelector('[data-filter="pending"]');
+            if (pendingBtn) {
+                pendingBtn.classList.add('active');
+            }
+        }, 100);
     }
 
     updateFilterButtons() {
@@ -1619,26 +1743,37 @@ class TodoApp {
         }).length;
         
         // Update filter button texts with counts
-        const allBtn = document.querySelector('[data-filter="all"]');
         const pendingBtn = document.querySelector('[data-filter="pending"]');
-        const btn4h = document.querySelector('[data-filter="4h"]');
-        const btn8h = document.querySelector('[data-filter="8h"]');
-        const btn24h = document.querySelector('[data-filter="24h"]');
+        const cycleBtn = document.getElementById('cycleFilterBtn');
         
-        if (allBtn) {
-            allBtn.innerHTML = `<i class="fas fa-list"></i> All (${totalCount})`;
-        }
         if (pendingBtn) {
             pendingBtn.innerHTML = `<i class="fas fa-clock"></i> Còn (${pendingCount})`;
         }
-        if (btn4h) {
-            btn4h.innerHTML = `<i class="fas fa-history"></i> 4h (${count4h})`;
-        }
-        if (btn8h) {
-            btn8h.innerHTML = `<i class="fas fa-history"></i> 8h (${count8h})`;
-        }
-        if (btn24h) {
-            btn24h.innerHTML = `<i class="fas fa-history"></i> 24h (${count24h})`;
+        
+        // Cập nhật cycle button với count tương ứng
+        if (cycleBtn) {
+            const currentCycleFilter = this.cycleFilters[this.currentCycleIndex];
+            let currentCount = 0;
+            
+            switch (currentCycleFilter) {
+                case '4h':
+                    currentCount = count4h;
+                    break;
+                case '8h':
+                    currentCount = count8h;
+                    break;
+                case '24h':
+                    currentCount = count24h;
+                    break;
+                case 'all':
+                    currentCount = totalCount;
+                    break;
+            }
+            
+            const cycleText = cycleBtn.querySelector('.cycle-text');
+            if (cycleText) {
+                cycleText.textContent = `${currentCycleFilter} (${currentCount})`;
+            }
         }
     }
 
@@ -1972,7 +2107,7 @@ class TodoApp {
                 `;
             }
             
-            const todosHtml = filteredProjectTodos.map(todo => {
+            const todosHtml = filteredProjectTodos.map((todo, index) => {
                 // Check if this todo can be selected as parent
                 let canBeParent = true;
                 let parentSelectionClass = '';
@@ -1989,26 +2124,50 @@ class TodoApp {
                     }
                 }
 
-                // Check if this todo can be selected for priority
-                let canBePriorityTarget = false;
-                let prioritySelectionClass = '';
+                // Check if this todo can be selected for move
+                let canBeMoveTarget = false;
+                let moveSelectionClass = '';
                 
-                if (this.prioritySelectionMode && this.selectedPriorityTodoId) {
-                    const selectedTodo = this.todos.find(t => t.id === this.selectedPriorityTodoId);
-                    if (todo.id === this.selectedPriorityTodoId) {
-                        prioritySelectionClass = 'priority-selection-selected';
+                if (this.moveSelectionMode && this.selectedMoveTodoId) {
+                    const selectedTodo = this.todos.find(t => t.id === this.selectedMoveTodoId);
+                    if (todo.id === this.selectedMoveTodoId) {
+                        moveSelectionClass = 'move-selection-selected';
                     } else if (selectedTodo && todo.parentId === selectedTodo.parentId) {
-                        canBePriorityTarget = true;
-                        prioritySelectionClass = 'priority-selection-available';
+                        canBeMoveTarget = true;
+                        moveSelectionClass = 'move-selection-available';
                     } else {
-                        prioritySelectionClass = 'priority-selection-unavailable';
+                        moveSelectionClass = 'move-selection-unavailable';
+                    }
+                }
+                
+                // Render move slots (khe) cho move mode - chỉ hiển thị slot "before"
+                let moveSlots = '';
+                if (this.moveSelectionMode && canBeMoveTarget && todo.id !== this.selectedMoveTodoId) {
+                    // Kiểm tra xem có phải là todo liền kề với todo được chọn không
+                    const selectedTodo = this.todos.find(t => t.id === this.selectedMoveTodoId);
+                    const siblings = filteredProjectTodos.filter(t => 
+                        t.parentId === selectedTodo.parentId && 
+                        t.projectId === selectedTodo.projectId
+                    ).sort((a, b) => a.order - b.order);
+                    
+                    const selectedIndex = siblings.findIndex(t => t.id === this.selectedMoveTodoId);
+                    const currentIndex = siblings.findIndex(t => t.id === todo.id);
+                    
+                    // Không hiển thị slot trước todo ngay sau todo được chọn
+                    const showBeforeSlot = !(currentIndex === selectedIndex + 1);
+                    
+                    if (showBeforeSlot) {
+                        moveSlots = `
+                            <div class="move-slot move-slot-before" onclick="todoApp.selectMoveSlot('${todo.id}', 'before')" title="Chèn trước todo này">
+                            </div>
+                        `;
                     }
                 }
                 
                 return `
-                <div class="todo-item ${todo.level > 0 ? `level-${todo.level}` : ''} ${parentSelectionClass} ${prioritySelectionClass}" data-id="${todo.id}" 
-                     ${this.parentSelectionMode && canBeParent ? `onclick="todoApp.selectParent('${todo.id}')"` : ''}
-                     ${this.prioritySelectionMode && canBePriorityTarget ? `onclick="todoApp.selectPriority('${todo.id}')"` : ''}>
+                ${moveSlots}
+                <div class="todo-item ${todo.level > 0 ? `level-${todo.level}` : ''} ${parentSelectionClass} ${moveSelectionClass}" data-id="${todo.id}" 
+                     ${this.parentSelectionMode && canBeParent ? `onclick="todoApp.selectParent('${todo.id}')"` : ''}>
                     <div class="todo-content">
                         ${this.renderTodoCheckbox(todo)}
                         <div class="todo-text ${todo.completed ? 'completed' : ''} ${todo.skipped ? 'skipped' : ''}" 
@@ -2025,6 +2184,34 @@ class TodoApp {
                         </div>
                     </div>
                 </div>
+                ${(() => {
+                    // Kiểm tra xem có cần thêm endSlot sau todo này không
+                    if (!this.moveSelectionMode || !this.selectedMoveTodoId) return '';
+                    
+                    const selectedTodo = this.todos.find(t => t.id === this.selectedMoveTodoId);
+                    if (!selectedTodo || selectedTodo.projectId !== project.id) return '';
+                    
+                    // Lấy danh sách siblings hiện đang hiển thị (sau filter)
+                    const visibleSiblings = filteredProjectTodos.filter(t => 
+                        t.parentId === selectedTodo.parentId && 
+                        t.projectId === selectedTodo.projectId
+                    );
+                    
+                    // Kiểm tra nếu todo hiện tại là todo cuối cùng trong nhóm siblings hiển thị
+                    const isLastVisibleSibling = visibleSiblings[visibleSiblings.length - 1]?.id === todo.id;
+                    
+                    // Chỉ hiển thị endSlot nếu:
+                    // 1. Todo hiện tại là cuối cùng trong nhóm siblings hiển thị
+                    // 2. Todo được chọn không phải là todo cuối cùng này
+                    if (isLastVisibleSibling && todo.id !== selectedTodo.id) {
+                        return `
+                            <div class="move-slot move-slot-end" onclick="todoApp.selectMoveSlot('${todo.id}', 'after')" title="Chèn vào cuối nhóm">
+                            </div>
+                        `;
+                    }
+                    
+                    return '';
+                })()}
                 `;
             }).join('');
             
@@ -2758,9 +2945,9 @@ class TodoApp {
                     <i class="fas fa-level-up-alt"></i>
                     Cha con
                 </div>
-                <div class="context-menu-item" onclick="todoApp.startPrioritySelection('${todoId}')">
-                    <i class="fas fa-exclamation"></i>
-                    Ưu tiên
+                <div class="context-menu-item" onclick="todoApp.startMoveSelection('${todoId}')">
+                    <i class="fas fa-arrows-alt-v"></i>
+                    Di chuyển
                 </div>
                 <div class="context-menu-item" onclick="todoApp.handleAsyncCall(todoApp.duplicateTodo, '${todoId}')">
                     <i class="fas fa-copy"></i>

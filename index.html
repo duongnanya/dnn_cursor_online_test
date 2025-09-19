@@ -80,26 +80,19 @@
                     <button class="filter-btn active" data-filter="pending">
                         <i class="fas fa-clock"></i> Còn
                     </button>
-                    <button class="filter-btn" data-filter="4h">
-                        <i class="fas fa-history"></i> 4h
+                    <button class="filter-btn cycle-btn" id="cycleFilterBtn" data-cycle="4h">
+                        <i class="fas fa-history"></i> <span class="cycle-text">4h</span>
                     </button>
-                    <button class="filter-btn" data-filter="8h">
-                        <i class="fas fa-history"></i> 8h
-                    </button>
-                    <button class="filter-btn" data-filter="24h">
-                        <i class="fas fa-history"></i> 24h
-                    </button>
-                    <button class="filter-btn" data-filter="all">
-                        <i class="fas fa-list"></i> All
-                    </button>
-                    <button class="filter-btn" id="collapseAllBtn" title="Thu gọn tất cả">
+                </div>
+                <div class="action-buttons">
+                    <button class="action-btn" id="collapseAllBtn" title="Thu gọn tất cả">
                         <i class="fas fa-compress-alt"></i>
                         <span>Thu gọn</span>
                     </button>
+                    <button class="calendar-btn" onclick="todoApp.goToCalendar()">
+                        <i class="fas fa-calendar-alt"></i> Calendar
+                    </button>
                 </div>
-                <button class="calendar-btn" onclick="todoApp.goToCalendar()">
-                    <i class="fas fa-calendar-alt"></i> Calendar
-                </button>
                 
                 <!-- User Avatar với Menu -->
                 <div class="user-avatar-container">

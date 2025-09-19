@@ -539,6 +539,63 @@ body {
     transform: translateY(-1px); /* Giữ hiệu ứng cho active state */
 }
 
+/* Cycle button styling - mặc định không có background */
+.filter-btn.cycle-btn {
+    background: white;
+    color: #666;
+    border-color: #e0e0e0;
+    position: relative;
+}
+
+.filter-btn.cycle-btn:hover {
+    border-color: #4CAF50;
+    color: #4CAF50;
+    transform: translateY(-1px);
+}
+
+/* Cycle button khi active (đang được chọn) */
+.filter-btn.cycle-btn.active {
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    color: white;
+    border-color: transparent;
+}
+
+.filter-btn.cycle-btn .cycle-text {
+    font-weight: 600;
+}
+
+/* Action buttons container */
+.action-buttons {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.action-btn {
+    padding: 10px 15px;
+    border: 2px solid #e0e0e0;
+    background: white;
+    border-radius: 25px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.9rem;
+    color: #666;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+.action-btn:hover {
+    border-color: #ff9800;
+    color: #ff9800;
+    transform: translateY(-1px);
+}
+
+.action-btn:active {
+    transform: translateY(0);
+}
+
 
 /* Multi Project Container */
 .multi-project-container {
@@ -985,7 +1042,7 @@ body {
 
 /* Disable hover effects in selection modes */
 .parent-selection-mode .todo-checkbox:hover,
-.priority-selection-mode .todo-checkbox:hover {
+.move-selection-mode .todo-checkbox:hover {
     border-color: #ddd;
 }
 
@@ -1166,8 +1223,8 @@ body {
     display: none !important;
 }
 
-/* Hide children-count in priority selection mode */
-.priority-selection-mode .children-count {
+/* Hide children-count in move selection mode */
+.move-selection-mode .children-count {
     display: none !important;
 }
 
@@ -1424,48 +1481,20 @@ body {
 }
 
 
-/* Priority Selection Effects */
-.priority-selection-available {
-    background: linear-gradient(135deg, rgba(220, 53, 69, 0.1), rgba(220, 53, 69, 0.05)) !important;
-    cursor: pointer !important;
+/* Move Selection Effects */
+.move-selection-available {
+    position: relative;
 }
 
-.priority-selection-available:hover {
-    background: linear-gradient(135deg, rgba(220, 53, 69, 0.2), rgba(220, 53, 69, 0.1)) !important;
-}
-
-.priority-selection-available::after {
-    content: "Nhấn để đưa lên trên";
-    position: absolute;
-    top: 50%;
-    right: 10px;
-    transform: translateY(-50%);
-    background: #dc3545;
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    font-weight: 500;
-    z-index: 1001;
-    opacity: 0;
-    white-space: nowrap;
-    transition: opacity 0.3s ease;
-    pointer-events: none;
-}
-
-.priority-selection-available:hover::after {
-    opacity: 0.9;
-}
-
-.priority-selection-selected {
+.move-selection-selected {
     background: linear-gradient(135deg, rgba(255, 193, 7, 0.2), rgba(255, 193, 7, 0.1)) !important;
-    border: 1px solid transparent !important;
+    border: 1px solid rgba(255, 193, 7, 0.3) !important;
     border-radius: 8px !important;
     opacity: 0.7 !important;
 }
 
-.priority-selection-selected::after {
-    content: "Todo đang chọn";
+.move-selection-selected::after {
+    content: "Todo đang di chuyển";
     position: absolute;
     top: 50%;
     right: 10px;
@@ -1483,11 +1512,11 @@ body {
     pointer-events: none;
 }
 
-.priority-selection-selected:hover::after {
+.move-selection-selected:hover::after {
     opacity: 0.9;
 }
 
-.priority-selection-unavailable {
+.move-selection-unavailable {
     background: linear-gradient(135deg, rgba(108, 117, 125, 0.1), rgba(108, 117, 125, 0.05)) !important;
     border: 1px solid transparent !important;
     border-radius: 8px !important;
@@ -1495,7 +1524,7 @@ body {
     cursor: not-allowed !important;
 }
 
-.priority-selection-unavailable::after {
+.move-selection-unavailable::after {
     content: "Không cùng mức";
     position: absolute;
     top: 50%;
@@ -1514,8 +1543,60 @@ body {
     pointer-events: none;
 }
 
-.priority-selection-unavailable:hover::after {
+.move-selection-unavailable:hover::after {
     opacity: 0.9;
+}
+
+/* Move Slots (Khe chèn) */
+.move-slot {
+    height: 12px;
+    margin: 6px 0;
+    border-radius: 2px;
+    background: rgba(0, 123, 255, 0.4);
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+    opacity: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.move-selection-mode .move-slot {
+    opacity: 1;
+}
+
+.move-slot:active {
+    transform: scale(0.95);
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    box-shadow: 0 1px 3px rgba(0, 123, 255, 0.4);
+}
+
+/* Tạo thanh ngang mảnh bằng pseudo-element */
+.move-slot::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    height: 2px;
+    background: rgba(0, 123, 255, 0.8);
+    border-radius: 1px;
+    z-index: 1;
+}
+
+.move-slot::after {
+    content: "Chèn vào đây";
+    background: rgba(0, 123, 255, 0.95);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    z-index: 2;
 }
 
 
